@@ -35,6 +35,8 @@ export const IMPORT_MODULE_OF_PAGE: Record<string, string> = {
   warehouse_transactions: 'wh_txn',
   waste: 'waste',
   stock_adjustments: 'adjustments',
+  closing_stock_count: 'closing',
+  kitchens_transfer: 'transfers',
 };
 
 export const DOC_TYPE_OF_PAGE: Record<string, string> = {
@@ -43,4 +45,5 @@ export const DOC_TYPE_OF_PAGE: Record<string, string> = {
   warehouse_transactions: 'WH_TXN',
   waste: 'WASTE',
   stock_adjustments: 'ADJUSTMENT',
+  closing_stock_count: 'CLOSING',
 };

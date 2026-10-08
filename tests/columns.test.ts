@@ -62,6 +62,8 @@ describe('mapRows', () => {
     expect(mapRows([['Date', 'Qty']], MODULES.opening).missing).toEqual(['code']);
     expect(mapRows([['Date', 'Code']], MODULES.opening).missing).toEqual(['qty']);
     expect(mapRows([['Date', 'Code', 'Qty']], MODULES.adjustments).missing).toEqual(['reason']);
+    expect(mapRows([['Date', 'Code', 'Qty']], MODULES.waste).missing).toEqual(['reason']);
+    expect(mapRows([['Date', 'Code']], MODULES.closing).missing).toEqual(['qty']);
     expect(mapRows([['Product Name', 'Cost']], MODULES.products).missing).toEqual(['syt_code']);
   });
   it('maps the real Odoo Data Product headers', () => {
@@ -74,6 +76,10 @@ describe('mapRows', () => {
     expect(r.rows[0].data).toEqual({
       syt_code: '1001', generic_code: 'G1', name: 'Flour 5kg', uom_name: 'Unit', category: 'Dry', cost: '52.5', cost_per_uom: '10.5',
     });
+  });
+  it('closing allows a zero count and maps like other tx modules', () => {
+    const r = mapRows([['Date', 'Syt Code', 'Counted Qty', 'Qty'], ['2026-12-31', 'T1', 9, 0]], MODULES.closing);
+    expect(r.rows[0].data).toEqual({ date: '2026-12-31', code: 'T1', qty: '0' });
   });
   it('maps Base Qty per Syt and accepts alternative headers', () => {
     const r = mapRows([['System Code', 'Name', 'Conversion', 'Cost/UOM'], ['S1', 'Rice', 3, 9]], MODULES.products);

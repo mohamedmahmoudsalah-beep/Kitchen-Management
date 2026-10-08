@@ -1,23 +1,15 @@
 import { notFound } from 'next/navigation';
 import DocumentsView from '@/components/DocumentsView';
+import PeriodsPanel from '@/components/PeriodsPanel';
 import ReasonsPanel from '@/components/ReasonsPanel';
+import StockReportView from '@/components/StockReportView';
+import TransfersView from '@/components/TransfersView';
 import { requirePage } from '@/lib/auth';
 import { DOC_TYPE_OF_PAGE, IMPORT_MODULE_OF_PAGE, PAGE_HREF } from '@/lib/nav';
 
-// الصفحات اللي لسه مبنتش (الدفعة 2+) + صفحات الحركات اللي ليها Import دلوقتي
-const SLUG_TO_KEY: Record<string, string> = Object.fromEntries(
-  Object.entries(PAGE_HREF)
-    .filter(([key]) => ['opening_balance', 'purchases', 'kitchens_transfer', 'warehouse_transactions', 'waste',
-      'closing_stock_count', 'consumption', 'warehouse_stock', 'stock_adjustments'].includes(key))
-    .map(([key, href]) => [href.slice(1), key]),
-);
-
-const LATER: Record<string, string> = {
-  kitchens_transfer: 'Transfer → In Transit → تأكيد المستلم → Return Pending (الدفعة 2).',
-  closing_stock_count: 'جرد الإقفال (Closing) كـ snapshot بيتحسب منه الاستهلاك (الدفعة 2).',
-  consumption: 'Consumption = Opening + Purchases + Transfer In − Transfer Out − Closing − Waste، كـ SQL View (الدفعة 2).',
-  warehouse_stock: 'Warehouse Stock كـ SQL View من الـ Ledger (الدفعة 2).',
-};
+const SLUG_KEYS = ['opening_balance', 'purchases', 'kitchens_transfer', 'warehouse_transactions', 'waste',
+  'closing_stock_count', 'consumption', 'warehouse_stock', 'stock_adjustments'];
+const SLUG_TO_KEY: Record<string, string> = Object.fromEntries(SLUG_KEYS.map((key) => [PAGE_HREF[key].slice(1), key]));
 
 export function generateStaticParams() {
   return Object.keys(SLUG_TO_KEY).map((slug) => ({ slug }));
@@ -28,24 +20,25 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
   const key = SLUG_TO_KEY[slug];
   if (!key) notFound();
   const s = await requirePage(key);
+  const role = s.profile.role;
+  const isAdmin = role === 'admin';
+  const canWrite = role !== 'viewer';
+  const canReverse = isAdmin || role === 'manager';
 
-  const docType = DOC_TYPE_OF_PAGE[key];
-  if (docType) {
-    const role = s.profile.role;
-    const canImport = role !== 'viewer' && s.pages.some((p) => p.key === 'import_export');
-    return (
-      <>
-        {(key === 'waste' || key === 'stock_adjustments') && <ReasonsPanel canAdd={role !== 'viewer'} isAdmin={role === 'admin'} />}
-        <DocumentsView docType={docType} importModule={IMPORT_MODULE_OF_PAGE[key]}
-          canReverse={role === 'admin' || role === 'manager'} canImport={canImport} />
-        <div className="alert warn" dir="auto">شاشة الإدخال اليدوي (Draft → Post) هتتضاف في الدفعة 2. دلوقتي الإدخال عن طريق Import from file.</div>
-      </>
-    );
+  if (key === 'warehouse_stock') return <StockReportView kind="stock" />;
+  if (key === 'consumption') return <StockReportView kind="consumption" />;
+  const canImport = canWrite && s.pages.some((p) => p.key === 'import_export');
+  if (key === 'kitchens_transfer') {
+    return <TransfersView canWrite={canWrite} canReverse={canReverse} isAdmin={isAdmin} canImport={canImport}
+      canAdjust={canWrite && s.pages.some((p) => p.key === 'stock_adjustments')} />;
   }
+
   return (
-    <div className="panel" dir="auto">
-      <h2>Coming next</h2>
-      <p className="muted">{LATER[key]}</p>
-    </div>
+    <>
+      {(key === 'waste' || key === 'stock_adjustments') && <ReasonsPanel canAdd={canWrite} isAdmin={isAdmin} />}
+      {key === 'closing_stock_count' && <PeriodsPanel canManage={canReverse} isAdmin={isAdmin} />}
+      <DocumentsView docType={DOC_TYPE_OF_PAGE[key]} importModule={IMPORT_MODULE_OF_PAGE[key]}
+        canWrite={canWrite} canReverse={canReverse} canImport={canImport} isAdmin={isAdmin} manual={key !== 'opening_balance'} />
+    </>
   );
 }

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { downloadCsv, downloadXlsx, ymd } from '@/lib/export';
 import ImportWizard from '@/components/ImportWizard';
 import ProductForm from '@/components/ProductForm';
+import TemplateButton from '@/components/TemplateButton';
 import type { Product } from '@/lib/types';
 
 const PAGE = 50;
@@ -111,6 +112,7 @@ export default function ProductsView({ canManage, isAdmin }: { canManage: boolea
           {canManage && (
             <>
               <button className="btn" onClick={() => { setPanel({ kind: 'add' }); setNote(null); }}><Plus size={14} /> Add product</button>
+              <TemplateButton module="products" />
               <button className="btn secondary" onClick={() => { setPanel({ kind: 'import', mode: 'upsert' }); setNote(null); }}><FileUp size={14} /> Import file</button>
               <button className="btn secondary" onClick={() => { setPanel({ kind: 'import', mode: 'update' }); setNote(null); }}><RefreshCw size={14} /> Update from file</button>
             </>

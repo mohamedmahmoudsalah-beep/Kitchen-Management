@@ -9,5 +9,5 @@ export default async function DashboardPage() {
     const first = s.pages[0];
     redirect(first ? PAGE_HREF[first.key] : '/no-access');
   }
-  return <DashboardView />;
+  return <DashboardView pages={s.pages.map((p) => p.key)} />;
 }

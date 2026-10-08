@@ -9,6 +9,7 @@ import { useScope } from '@/components/ScopeProvider';
 import { MODULES, MODULE_ORDER, mapRows, FIELD_LABEL, type ImportModule, type MappedFile } from '@/lib/import/columns';
 import { readTable } from '@/lib/import/parse-file';
 import { downloadCsv, ymd } from '@/lib/export';
+import TemplateButton from '@/components/TemplateButton';
 
 type Phase = 'idle' | 'parsed' | 'validating' | 'invalid' | 'valid' | 'committing' | 'done';
 type ErrRow = { row_no: number; column_name: string | null; reason: string; raw: Record<string, unknown> | null };
@@ -118,6 +119,10 @@ export default function ImportWizard({ allowed, isAdmin, fixedModule, initialMod
       }
       const text = module === 'products'
         ? `اتحفظ: ${res.inserted} منتج جديد و ${res.updated} منتج اتحدّث.`
+        : module === 'transfers'
+        ? `اتبعت ${res.documents} تحويل (${res.lines} سطر) من ${batchKitchen} وبقوا In Transit — المطبخ المستلم يأكد الكمية الفعلية من صفحته.`
+        : module === 'closing'
+        ? `اتسجل الجرد (${res.lines} سطر) للمطبخ ${batchKitchen}، والفروق عن رصيد الدفتر اتسجلت تلقائيًا كتسوية Count Correction.`
         : `اتحفظ ${res.lines} سطر في ${res.documents} مستند (Posted) للمطبخ ${batchKitchen}.`;
       setMessage({ kind: 'ok', text }); setPhase('done'); onDone?.();
     } catch (e) {
@@ -164,9 +169,7 @@ export default function ImportWizard({ allowed, isAdmin, fixedModule, initialMod
               </select>
             </label>
           )}
-          <button className="btn secondary" onClick={() => downloadCsv(`${module}-template.csv`, spec.template, [])}>
-            <Download size={14} /> Template
-          </button>
+          <TemplateButton module={module} />
         </div>
         <p className="muted" style={{ margin: '10px 0 0' }} dir="auto">
           {spec.needsKitchen

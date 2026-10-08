@@ -208,15 +208,15 @@ select testh.logout();
 select testh.login('ali@breadfast.com');
 -- S2 رصيده 3 قطع x 1 = 3 | waste 2 ثم 2 في يوم تاني => تجاوز
 select testh.stage('waste', :'k_plus', '[
-  {"date":"2026-10-02","code":"S2","qty":"2"},
-  {"date":"2026-10-03","code":"S2","qty":"2"}
+  {"date":"2026-10-02","code":"S2","qty":"2","reason":"Damage"},
+  {"date":"2026-10-03","code":"S2","qty":"2","reason":"Damage"}
 ]'::jsonb) as w_bad \gset
 select testh.assert_eq('waste exceeding balance rejected', (select error_count from public.import_batches where id = :'w_bad'), 1);
 select testh.assert_eq('waste error points at row 2',
   (select row_no from public.import_errors where batch_id = :'w_bad'), 2);
 select testh.assert_eq('waste error text', (select count(*) from public.import_errors where batch_id = :'w_bad' and reason like '%رصيد غير كافٍ%'), 1::bigint);
 
-select testh.stage('waste', :'k_plus', '[{"date":"2026-10-02","code":"S2","qty":"2"}]'::jsonb) as w_ok \gset
+select testh.stage('waste', :'k_plus', '[{"date":"2026-10-02","code":"S2","qty":"2","reason":"Damage"}]'::jsonb) as w_ok \gset
 select public.import_commit(:'w_ok'::uuid) as res \gset
 select testh.assert_eq('waste deducted from balance',
   (select qty_base from public.stock_balances b join public.products p on p.id = b.product_id where p.syt_code = 'S2'), 1::numeric);
@@ -305,7 +305,7 @@ select testh.logout();
 
 -- ويست على S1 بيخلي رصيده أقل من الافتتاحي => الـ Reverse للافتتاحي لازم يترفض
 select testh.login('ali@breadfast.com');
-select testh.stage('waste', :'k_plus', '[{"date":"2026-11-03","code":"S1","qty_base":"15"}]'::jsonb) as w_s1 \gset
+select testh.stage('waste', :'k_plus', '[{"date":"2026-11-03","code":"S1","qty_base":"15","reason":"Damage"}]'::jsonb) as w_s1 \gset
 select public.import_commit(:'w_s1'::uuid) as res \gset
 select testh.logout();
 
@@ -418,15 +418,16 @@ select testh.assert_eq('kitchen user added a reason', (select count(*) from publ
 -- S3 رصيده 7: Waste بسبب من القايمة
 select testh.stage('waste', :'k_plus', '[
   {"date":"2026-11-04","code":"S3","qty":"1","reason":"spilled"},
-  {"date":"2026-11-04","code":"S3","qty":"1","reason":"Merge"},
-  {"date":"2026-11-04","code":"S3","qty":"1"}
+  {"date":"2026-11-04","code":"S3","qty":"1","reason":"Merge"}
 ]'::jsonb, 'BASE') as wr_ok \gset
-select testh.assert_eq('waste with list reasons / no reason accepted', (select status from public.import_batches where id = :'wr_ok'), 'validated');
+select testh.stage('waste', :'k_plus', '[{"date":"2026-11-04","code":"S3","qty":"1"}]'::jsonb, 'BASE') as wr_none \gset
+select testh.assert_eq('waste without reason is rejected (reason required)', (select count(*) from public.import_errors where batch_id = :'wr_none' and reason like '%Reason مطلوب%'), 1::bigint);
+select testh.assert_eq('waste with list reasons accepted', (select status from public.import_batches where id = :'wr_ok'), 'validated');
 select public.import_commit(:'wr_ok'::uuid) as res \gset
 select testh.assert_eq('waste lines keep reason names + ids',
   (select string_agg(coalesce(l.reason, 'none') || ':' || (l.reason_id is not null)::text, ',' order by l.line_no)
      from public.document_lines l join public.documents d on d.id = l.document_id where d.import_batch_id = :'wr_ok'),
-  'Spilled:true,Merge:true,none:false');
+  'Spilled:true,Merge:true');
 
 select testh.stage('waste', :'k_plus', '[
   {"date":"2026-11-05","code":"S3","qty":"1","reason":"Overage"},
