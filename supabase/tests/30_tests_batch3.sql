@@ -133,8 +133,9 @@ select testh.assert_eq('dashboard: outgoing transfers waiting = 2 (imported) ',
 select testh.assert_eq('dashboard: stock value NC7 = N1 66*5 + N2 42*2 = 414',
   (:'dash'::jsonb ->> 'stock_value')::numeric, 414::numeric);
 select testh.assert_eq('dashboard: last closing is the April no-apply count', (:'dash'::jsonb ->> 'last_closing'), '2027-04-30');
-select testh.assert_eq('dashboard: pending_users hidden from non-admin', (:'dash'::jsonb ->> 'pending_users') is null, true);
+select testh.assert_eq('dashboard: pending_users visible to manager', (:'dash'::jsonb ->> 'pending_users') is not null, true);
 select testh.login('ali@breadfast.com');
+select testh.assert_eq('dashboard: pending_users hidden from kitchen user', (public.dashboard_summary(:'k_plus') ->> 'pending_users') is null, true);
 select testh.assert_eq('dashboard: incoming to confirm for receiver', (public.dashboard_summary(:'k_plus') ->> 'incoming_to_confirm')::int, 1);
 select testh.expect_err(format($$select public.dashboard_summary(%L)$$, :'k_nc7'), '%مش مسموحلك%');
 select testh.logout();

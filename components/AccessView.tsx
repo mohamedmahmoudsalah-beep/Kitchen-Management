@@ -7,9 +7,9 @@ const ROLES: Role[] = ['admin', 'manager', 'kitchen_user', 'viewer'];
 type Invite = { email: string; role: Role; is_active: boolean; kitchen_ids: string[]; page_keys: string[] };
 type Values = { role: Role; active: boolean; kitchens: string[]; pages: string[] };
 
-function Editor({ kitchens, pages, initial, locked, submitLabel, onSubmit, email, onEmail }: {
+function Editor({ kitchens, pages, initial, locked, submitLabel, onSubmit, email, onEmail, roles = ROLES }: {
   kitchens: Kitchen[]; pages: PageDef[]; initial: Values; locked?: boolean; submitLabel: string;
-  onSubmit: (v: Values) => Promise<void>; email?: string; onEmail?: (v: string) => void;
+  onSubmit: (v: Values) => Promise<void>; email?: string; onEmail?: (v: string) => void; roles?: Role[];
 }) {
   const [v, setV] = useState<Values>(initial);
   const [busy, setBusy] = useState(false);
@@ -27,7 +27,7 @@ function Editor({ kitchens, pages, initial, locked, submitLabel, onSubmit, email
       <div className="form-row">
         <label className="field"><span>Role</span>
           <select value={v.role} disabled={locked} onChange={(e) => setV({ ...v, role: e.target.value as Role })}>
-            {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+            {roles.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
         </label>
         <label className="checks" style={{ paddingBottom: 6 }}>
@@ -66,7 +66,7 @@ function Editor({ kitchens, pages, initial, locked, submitLabel, onSubmit, email
   );
 }
 
-export default function AccessView() {
+export default function AccessView({ isAdmin, managerPages }: { isAdmin: boolean; managerPages: string[] }) {
   const supabase = useMemo(() => createClient(), []);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [uk, setUk] = useState<{ user_id: string; kitchen_id: string }[]>([]);
@@ -96,6 +96,8 @@ export default function AccessView() {
 
   useEffect(() => { load(); }, [load]);
 
+  // الـ Manager مش بيدّي صفحات أكتر من صفحاته
+  const scopedPages = isAdmin ? pages : pages.filter((p) => managerPages.includes(p.key));
   const sorted = [...profiles].sort((a, b) => Number(a.is_active) - Number(b.is_active) || a.email.localeCompare(b.email));
   const kitchenName = (id: string) => kitchens.find((k) => k.id === id)?.name ?? id;
 
@@ -123,6 +125,11 @@ export default function AccessView() {
   return (
     <>
       {msg && <div className={`alert ${msg.kind}`} dir="auto">{msg.text}</div>}
+      {!isAdmin && (
+        <div className="alert ok" dir="auto">
+          تقدر توافق على المستخدمين المعلقين وتدّيهم Viewer أو Kitchen User على مطابخك وصفحاتك بس، وتعدّل الناس اللي معاك في نفس المطبخ. مش بتقدر تدّي صلاحيات أكتر من اللي معاك.
+        </div>
+      )}
 
       <div className="panel flush">
         <div className="toolbar"><b>Users</b><span className="muted">{profiles.length} users</span></div>
@@ -143,12 +150,17 @@ export default function AccessView() {
                         <td>{p.is_active ? <span className="badge ok">Active</span> : <span className="badge warn">Pending activation</span>}</td>
                         <td>{p.role === 'admin' ? 'All' : ks.map(kitchenName).join(', ') || <span className="muted">—</span>}</td>
                         <td>{p.role === 'admin' ? 'All' : ps.length}</td>
-                        <td><button className="btn secondary small" onClick={() => setOpen(isOpen ? null : p.user_id)}>{isOpen ? 'Close' : 'Edit'}</button></td>
+                        <td><button className={`btn ${p.is_active ? 'secondary' : ''} small`} onClick={() => setOpen(isOpen ? null : p.user_id)}>{isOpen ? 'Close' : p.is_active ? 'Edit' : 'Approve'}</button></td>
                       </>
                     }
                     detail={isOpen ? (
-                      <Editor kitchens={kitchens} pages={pages} locked={p.is_root} submitLabel="Save access"
-                        initial={{ role: p.role, active: p.is_active, kitchens: ks, pages: ps }} onSubmit={(v) => save(p, v)} />
+                      <Editor kitchens={kitchens} pages={scopedPages} locked={p.is_root} submitLabel={p.is_active ? 'Save access' : 'Approve and save'}
+                        roles={isAdmin ? ROLES : ['viewer', 'kitchen_user']}
+                        initial={{
+                          role: p.is_active || isAdmin ? p.role : 'kitchen_user', active: true,
+                          kitchens: isAdmin ? ks : ks.filter((k) => kitchens.some((x) => x.id === k)),
+                          pages: isAdmin ? ps : ps.filter((x) => scopedPages.some((g) => g.key === x)),
+                        }} onSubmit={(v) => save(p, v)} />
                     ) : null}
                   />
                 );
@@ -159,7 +171,7 @@ export default function AccessView() {
         </div>
       </div>
 
-      {invites.length > 0 && (
+      {isAdmin && invites.length > 0 && (
         <div className="panel flush">
           <div className="toolbar"><b>Invited (not signed in yet)</b></div>
           <table className="grid">
@@ -177,16 +189,16 @@ export default function AccessView() {
         </div>
       )}
 
-      <div className="panel">
+      {isAdmin && <div className="panel">
         <h2>Add user (pre-register by email)</h2>
         <p className="muted" style={{ marginTop: 0 }} dir="auto">
-          سجّل الإيميل وصلاحياته قبل أول دخول. أي حد بإيميل @breadfast.com يدخل من غير دعوة بيتعمله Profile غير Active وبيظهر فوق في Pending عشان تفعّله.
+          سجّل الإيميل وصلاحياته قبل أول دخول (أي إيميل جوجل). أي حد يسجّل من غير دعوة بيتعمله Profile غير Active وبيظهر فوق في Pending، وميدخلش حاجة لحد ما أنت أو أي Manager يوافق عليه ويدّيله صلاحياته.
         </p>
         {kitchens.length > 0 && (
           <Editor key={inviteKey} kitchens={kitchens} pages={pages} submitLabel="Add user" email={inviteEmail} onEmail={setInviteEmail}
             initial={{ role: 'kitchen_user', active: true, kitchens: [], pages: [] }} onSubmit={invite} />
         )}
-      </div>
+      </div>}
     </>
   );
 }

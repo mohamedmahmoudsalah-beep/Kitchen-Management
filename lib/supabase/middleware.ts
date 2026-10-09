@@ -25,9 +25,22 @@ export async function updateSession(request: NextRequest) {
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + '/'));
 
   if (!user && !isPublic) {
+    const params = request.nextUrl.searchParams;
     const redirect = request.nextUrl.clone();
+
+    // لو Supabase رجّع الـ code على أي مسار تاني (Site URL مش مظبوط)، كمّل عملية الدخول
+    if (params.get('code')) {
+      redirect.pathname = '/auth/callback';
+      return NextResponse.redirect(redirect);
+    }
+
+    // احتفظ برسالة الخطأ عشان تظهر في صفحة الـ Login (مكانتش بتظهر قبل كده)
     redirect.pathname = '/login';
     redirect.search = '';
+    for (const k of ['error', 'error_code', 'error_description']) {
+      const v = params.get(k);
+      if (v) redirect.searchParams.set(k, v);
+    }
     return NextResponse.redirect(redirect);
   }
   return response;

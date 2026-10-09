@@ -1,18 +1,20 @@
-# Kitchen Management System — الدفعات 1 و 2 و 3
+# Kitchen Management System — الدفعات 1 و 2 و 3 (+ 3.1)
 
 الأساس + Auth + Data Product + Import (مجاني بالكامل: Supabase Free + Next.js على Vercel).
 
 ## 1) Supabase
 1. اعمل Project جديد (Free).
 2. **SQL Editor**: شغّل الملفات بالترتيب من `supabase/migrations/`:
-   `001_foundation.sql` ← `002_stock_engine.sql` ← `003_import.sql` ← `004_grants.sql` ← `005_data_product_v2_reasons.sql` ← `006_batch2_entry_transfers_closing_reports.sql` ← `007_batch3_closing_opening_writeoff_transfers_import.sql`
-   - لو كنت شغّلت لحد 006 قبل كده: شغّل `007` بس (بيحدّث الموجود ومش بيمسح داتا).
-   - `005` و`006` و`007` بيعيدوا تطبيق الـ grants في آخرهم، فمفيش داعي تشغّل 004 تاني.
+   `001_foundation.sql` ← `002_stock_engine.sql` ← `003_import.sql` ← `004_grants.sql` ← `005_data_product_v2_reasons.sql` ← `006_batch2_entry_transfers_closing_reports.sql` ← `007_batch3_closing_opening_writeoff_transfers_import.sql` ← `008_open_signup_manager_approval.sql`
+   - لو كنت شغّلت لحد 007 قبل كده: شغّل `008` بس (بيحدّث الموجود ومش بيمسح داتا).
+   - `005` لحد `008` بيعيدوا تطبيق الـ grants في آخرهم، فمفيش داعي تشغّل 004 تاني.
 3. **Authentication → Providers**: فعّل **Google** (محتاج OAuth Client من Google Cloud Console).
    - Redirect URL في Google Cloud: `https://<project>.supabase.co/auth/v1/callback`
 4. **Authentication → URL Configuration**: ضيف الـ Site URL و `https://<your-app>/auth/callback` في Redirect URLs (وكمان `http://localhost:3000/auth/callback` للتجربة).
 5. **Authentication → Providers → Email**: عطّل Sign ups بالإيميل/الباسورد (الدخول بجوجل بس).
-6. أول دخول بـ `mohamed.mahmoudsalah@breadfast.com` بيتعمل له Admin أساسي تلقائيًا (مينفعش يتعطل أو يتحذف). أي إيميل مش `@breadfast.com` بيترفض من الـ DB نفسه.
+6. أول دخول بـ `mohamed.mahmoudsalah@breadfast.com` بيتعمل له Admin أساسي تلقائيًا (مينفعش يتعطل أو يتحذف).
+7. **أي حساب جوجل** يقدر يسجّل (مش شرط breadfast)، بس بيتعمله Profile **غير Active** وميشوفش ولا يعمل أي حاجة لحد ما **Admin أو Manager** يوافق عليه من **Access Control** ويدّيله مطابخه وصفحاته. في Google Cloud خلّي الـ OAuth consent screen **External** (ولما تجهز اضغط Publish app عشان مفيش حد Test users).
+   - الـ Manager يوافق على المعلقين ويدّيهم Viewer أو Kitchen User بس، على **مطابخه وصفحاته هو بس**، ومبيلمسش مطابخ/صفحات المستخدم اللي برا نطاقه. تعيين Manager/Admin للـ Admin بس.
 
 > Supabase Free بيعمل Pause بعد 7 أيام من عدم الاستخدام وملوش Backups تلقائية → صدّر بياناتك دوريًا (كل صفحة فيها Export).
 

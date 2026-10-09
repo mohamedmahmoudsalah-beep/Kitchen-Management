@@ -59,9 +59,10 @@ select testh.assert_eq('root profile is active admin',
   'admintruetrue');
 select testh.assert_eq('unregistered user -> inactive viewer profile',
   (select role::text || is_active::text from public.profiles where email = 'ali@breadfast.com'), 'viewerfalse');
-select testh.expect_err($$insert into auth.users (email) values ('x@gmail.com')$$, '%breadfast.com%');
-select testh.expect_err($$insert into auth.users (email) values ('x@sub.breadfast.com')$$, '%breadfast.com%');
-select testh.expect_err($$update auth.users set email = 'ali@gmail.com' where email = 'Ali@Breadfast.com'$$, '%breadfast.com%');
+-- أي دومين يقدر يسجّل، بس بيتعمله Profile غير Active (من 008)
+insert into auth.users (email) values ('x@gmail.com');
+select testh.assert_eq('non-breadfast account can sign up but is inactive',
+  (select role::text || is_active::text from public.profiles where email = 'x@gmail.com'), 'viewerfalse');
 
 -- الـ Root محمي
 select testh.expect_err($$update public.profiles set is_active = false where is_root$$, '%الأساسي%');
@@ -73,7 +74,7 @@ select testh.expect_err($$delete from auth.users where email = 'mohamed.mahmouds
 select testh.login('ali@breadfast.com');
 select testh.assert_eq('inactive user sees no kitchens', (select count(*) from public.kitchens), 0::bigint);
 select testh.assert_eq('inactive user sees no products', (select count(*) from public.products), 0::bigint);
-select testh.expect_err($$select public.set_user_access(gen_random_uuid(), 'admin', true, '{}', '{}')$$, '%للـ Admin بس%');
+select testh.expect_err($$select public.set_user_access(gen_random_uuid(), 'admin', true, '{}', '{}')$$, '%Admin أو الـ Manager%');
 select testh.logout();
 
 -- الـ Admin يدّي صلاحيات
@@ -91,7 +92,7 @@ select testh.expect_err(
 -- دعوة مسبقة: بتتطبق عند أول دخول
 select public.invite_user('Sara@breadfast.com', 'manager', true,
   array[(select id from public.kitchens where code = 'MAADI')], array['purchases', 'audit_log']);
-select testh.expect_err($$select public.invite_user('bad@gmail.com','viewer',true,'{}','{}')$$, '%@breadfast.com%');
+select testh.expect_err($$select public.invite_user('not-an-email','viewer',true,'{}','{}')$$, '%الإيميل%');
 select testh.logout();
 insert into auth.users (email) values ('sara@breadfast.com');
 select testh.assert_eq('invite applied on first login',

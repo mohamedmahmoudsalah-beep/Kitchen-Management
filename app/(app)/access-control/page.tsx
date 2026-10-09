@@ -3,6 +3,7 @@ import { requirePage } from '@/lib/auth';
 
 export default async function Page() {
   const s = await requirePage('access_control');
-  if (s.profile.role !== 'admin') return null;
-  return <AccessView />;
+  const role = s.profile.role;
+  if (role !== 'admin' && role !== 'manager') return null;
+  return <AccessView isAdmin={role === 'admin'} managerPages={s.pages.map((p) => p.key).filter((k) => k !== 'access_control')} />;
 }

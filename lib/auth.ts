@@ -33,7 +33,8 @@ export const getSession = cache(async (): Promise<Session> => {
     email: user.email ?? profile.email,
     profile: profile as Profile,
     kitchens: (kitchens ?? []) as Kitchen[],
-    pages: ((pages ?? []) as PageDef[]).filter((p) => (isAdmin ? true : p.key !== 'access_control' && allowed.has(p.key))),
+    // Access Control: للـ Admin كامل وللـ Manager (موافقة المستخدمين بحدود)
+    pages: ((pages ?? []) as PageDef[]).filter((p) => (isAdmin ? true : p.key === 'access_control' ? profile.role === 'manager' : allowed.has(p.key))),
   };
 });
 

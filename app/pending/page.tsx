@@ -15,7 +15,7 @@ export default async function PendingPage() {
         <div className="logo">K</div>
         <h1>Waiting for activation</h1>
         <p className="muted" dir="auto">
-          حسابك ({user.email}) اتسجل، بس لسه مستني الـ Admin يفعّله ويديك المطابخ والصفحات.
+          حسابك ({user.email}) اتسجل، بس لسه مستني الـ Admin أو المدير يوافق عليه ويديك المطابخ والصفحات. هتقدر تدخل أول ما يتأكد.
         </p>
         <SignOutButton className="btn secondary" label="Sign out" />
       </div>
