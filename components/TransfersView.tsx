@@ -233,7 +233,7 @@ export default function TransfersView({ canWrite, canReverse, isAdmin, canImport
     <>
       {editor && kitchen && (
         <DocumentEditor key={editor.id ?? 'new'} docType="TRANSFER" kitchenId={kitchenId} kitchenName={kitchen.name} kitchens={allKitchens}
-          docId={editor.id} isAdmin={isAdmin} defaultDate={to} onClose={() => setEditor(null)} onChanged={done} />
+          docId={editor.id} isAdmin={isAdmin} defaultDate={ymd(new Date())} onClose={() => setEditor(null)} onChanged={done} />
       )}
       {dialog && <QtyDialog kind={dialog.kind} doc={dialog.doc} isAdmin={isAdmin} canAdjust={canAdjust} onClose={() => setDialog(null)} onDone={done} />}
 

@@ -10,6 +10,7 @@ import { MODULES, MODULE_ORDER, mapRows, FIELD_LABEL, type ImportModule, type Ma
 import { readTable } from '@/lib/import/parse-file';
 import { downloadCsv, ymd } from '@/lib/export';
 import TemplateButton from '@/components/TemplateButton';
+import { applyChoices, findAmbiguous, lastPurchased, loadProductsForCodes, type Ambig } from '@/lib/import/ambiguous';
 
 type Phase = 'idle' | 'parsed' | 'validating' | 'invalid' | 'valid' | 'committing' | 'done';
 type ErrRow = { row_no: number; column_name: string | null; reason: string; raw: Record<string, unknown> | null };
@@ -40,12 +41,15 @@ export default function ImportWizard({ allowed, isAdmin, fixedModule, initialMod
   const [message, setMessage] = useState<{ kind: 'err' | 'ok'; text: string } | null>(null);
 
   const [batchKitchen, setBatchKitchen] = useState('');
+  const [ambig, setAmbig] = useState<Ambig[]>([]);
+  const [choices, setChoices] = useState<Record<string, string>>({});
+  const [last, setLast] = useState<Record<string, { syt: string; date: string }>>({});
   const spec = MODULES[module];
   const busy = phase === 'validating' || phase === 'committing';
 
   function reset(keepFile = false) {
     setPhase(keepFile && parsed ? 'parsed' : 'idle'); setBatch(null); setErrors([]); setErrCount(0); setMessage(null);
-    if (!keepFile) { setFile(null); setParsed(null); if (fileRef.current) fileRef.current.value = ''; }
+    if (!keepFile) { setAmbig([]); setChoices({}); setLast({}); setFile(null); setParsed(null); if (fileRef.current) fileRef.current.value = ''; }
   }
 
   // لو المطبخ اتغيّر بعد الفحص، الـ Batch القديم ملوش لازمة
@@ -63,6 +67,16 @@ export default function ImportWizard({ allowed, isAdmin, fixedModule, initialMod
       const m = mapRows(table, spec);
       setParsed(m);
       setPhase('parsed');
+      // أكواد بتطابق أكتر من حجم: نقترح آخر حجم اتشترى ونسيب المستخدم يختار
+      if (spec.needsKitchen && m.missing.length === 0 && m.rows.length > 0) {
+        const prods = await loadProductsForCodes(supabase, m.rows);
+        const amb = findAmbiguous(m.rows, prods);
+        const lp = await lastPurchased(supabase, amb.map((a) => a.code));
+        setAmbig(amb); setLast(lp);
+        setChoices(Object.fromEntries(amb.flatMap((a) => {
+          const l = lp[a.code]?.syt; return l && a.options.some((o) => o.syt_code === l) ? [[a.code, l]] : [];
+        })));
+      }
     } catch (e) {
       setMessage({ kind: 'err', text: e instanceof Error ? e.message : 'مقدرتش أقرا الملف' });
     }
@@ -76,15 +90,16 @@ export default function ImportWizard({ allowed, isAdmin, fixedModule, initialMod
   async function validate() {
     if (!file || !parsed) return;
     setPhase('validating'); setMessage(null); setErrors([]);
+    const rowsToSend = applyChoices(parsed.rows, choices);
     try {
       const { data: id, error: e1 } = await supabase.rpc('import_start', {
         p_module: module, p_kitchen: spec.needsKitchen ? kitchen?.id ?? null : null,
-        p_file: file.name, p_total: parsed.rows.length, p_qty_mode: qtyMode, p_mode: importMode,
+        p_file: file.name, p_total: rowsToSend.length, p_qty_mode: qtyMode, p_mode: importMode,
       });
       if (e1) throw e1;
       setBatch(id as string); setBatchKitchen(kitchen?.name ?? '');
       for (let i = 0; i < parsed.rows.length; i += CHUNK) {
-        const { error } = await supabase.rpc('import_stage_rows', { p_batch: id, p_rows: parsed.rows.slice(i, i + CHUNK) });
+        const { error } = await supabase.rpc('import_stage_rows', { p_batch: id, p_rows: rowsToSend.slice(i, i + CHUNK) });
         if (error) throw error;
       }
       const { data: res, error: e2 } = await supabase.rpc('import_validate', {
@@ -132,7 +147,8 @@ export default function ImportWizard({ allowed, isAdmin, fixedModule, initialMod
   }
 
   const missingText = parsed?.missing.map((k) => FIELD_LABEL[k] ?? k).join(', ');
-  const canValidate = !!parsed && parsed.missing.length === 0 && parsed.rows.length > 0 && !busy
+  const unresolved = ambig.filter((a) => !choices[a.code]).length;
+  const canValidate = !!parsed && parsed.missing.length === 0 && parsed.rows.length > 0 && !busy && unresolved === 0
     && (!spec.needsKitchen || !!kitchen) && (phase === 'parsed' || phase === 'invalid' || phase === 'valid');
 
   return (
@@ -206,6 +222,33 @@ export default function ImportWizard({ allowed, isAdmin, fixedModule, initialMod
               <div className="alert err" style={{ marginTop: 8 }} dir="auto">أعمدة مطلوبة ناقصة في الملف: <b>{missingText}</b></div>
             )}
             {parsed.rows.length === 0 && parsed.missing.length === 0 && <div className="alert err" style={{ marginTop: 8 }}>الملف مفيهوش صفوف داتا</div>}
+            {ambig.length > 0 && (
+              <div className="alert warn" style={{ marginTop: 10 }} dir="auto">
+                <b>{ambig.length} كود بيطابق أكتر من حجم (Syt Code).</b> اختار الحجم لكل كود — الحجم اللي اتشترى بيه آخر مرة متختار تلقائيًا. مش لازم ترفع الملف من جديد.
+                <div className="table-wrap" style={{ marginTop: 8, maxHeight: 360 }}>
+                  <table className="grid">
+                    <thead><tr><th>Code (Generic)</th><th className="num">Rows</th><th>Size to use</th><th>Last purchased</th></tr></thead>
+                    <tbody>
+                      {ambig.map((a) => (
+                        <tr key={a.code}>
+                          <td className="mono">{a.code}</td>
+                          <td className="num">{a.rowCount}</td>
+                          <td>
+                            <select value={choices[a.code] ?? ''} disabled={busy} style={{ minWidth: 300 }}
+                              onChange={(e) => { setChoices((c) => ({ ...c, [a.code]: e.target.value })); if (phase === 'valid' || phase === 'invalid') reset(true); }}>
+                              <option value="">— اختار الحجم —</option>
+                              {a.options.map((o) => <option key={o.id} value={o.syt_code}>{o.syt_code} · {o.name} · 1 Syt = {Number(o.uom_factor)} base</option>)}
+                            </select>
+                          </td>
+                          <td className="muted">{last[a.code] ? `${last[a.code].syt} (${last[a.code].date})` : 'مفيش مشتريات قبل كده'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {unresolved > 0 && <div style={{ marginTop: 6 }}>لسه فاضل <b>{unresolved}</b> كود من غير اختيار.</div>}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -3,21 +3,25 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Lock, Unlock } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useScope } from '@/components/ScopeProvider';
+import { buildArchive } from '@/lib/archive';
+import { saveBlob } from '@/lib/export';
+import { monthRange, prevMonth } from '@/lib/months';
 
 type P = { id: string; from_date: string; to_date: string; status: 'OPEN' | 'CLOSED'; closed_at: string | null; reopen_reason: string | null };
 
 // قفل الفترات للمطبخ المختار: بعد القفل مفيش إدخال/تعديل بتاريخ رجعي إلا للـ Admin وبسبب مسجّل
 export default function PeriodsPanel({ canManage, isAdmin }: { canManage: boolean; isAdmin: boolean }) {
   const supabase = useMemo(() => createClient(), []);
-  const { kitchenId, kitchen, from, to } = useScope();
+  const { kitchenId, kitchen } = useScope();
   const [rows, setRows] = useState<P[]>([]);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
-  const [pFrom, setPFrom] = useState(from);
-  const [pTo, setPTo] = useState(to);
+  const [mFrom, setMFrom] = useState(prevMonth());
+  const [mTo, setMTo] = useState(prevMonth());
+  const [step, setStep] = useState<'idle' | 'downloading' | 'confirm'>('idle');
+  const [progress, setProgress] = useState('');
+  const range = monthRange(mFrom, mTo);
   const [reopen, setReopen] = useState<P | null>(null);
   const [reason, setReason] = useState('');
-
-  useEffect(() => { setPFrom(from); setPTo(to); }, [from, to]);
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.from('periods').select('id,from_date,to_date,status,closed_at,reopen_reason')
@@ -26,11 +30,23 @@ export default function PeriodsPanel({ canManage, isAdmin }: { canManage: boolea
   }, [supabase, kitchenId]);
   useEffect(() => { load(); }, [load]);
 
-  async function close() {
-    setMsg(null);
-    const { error } = await supabase.rpc('close_period', { p_kitchen: kitchenId, p_from: pFrom, p_to: pTo });
+  // 1) تنزيل صفحات المطبخ للفترة (Excel) 2) تأكيد 3) القفل
+  async function startClose() {
+    if (!range || !kitchen) return;
+    setMsg(null); setStep('downloading'); setProgress('Starting…');
+    try {
+      const a = await buildArchive(supabase, { kitchens: [kitchen], from: range.from, to: range.to, onProgress: setProgress });
+      saveBlob(a.blob, a.name);
+      setStep('confirm');
+    } catch (e) { setStep('idle'); setMsg({ kind: 'err', text: `التنزيل فشل — الفترة ما اتقفلتش: ${e instanceof Error ? e.message : String(e)}` }); }
+  }
+
+  async function confirmClose() {
+    if (!range) return;
+    const { error } = await supabase.rpc('close_period', { p_kitchen: kitchenId, p_from: range.from, p_to: range.to });
+    setStep('idle');
     if (error) setMsg({ kind: 'err', text: error.message.includes('conflicting') ? 'الفترة دي بتتداخل مع فترة مقفولة قبل كده' : error.message });
-    else { setMsg({ kind: 'ok', text: `اتقفلت الفترة ${pFrom} → ${pTo} للمطبخ ${kitchen?.name}` }); await load(); }
+    else { setMsg({ kind: 'ok', text: `اتقفلت الفترة ${range.from} → ${range.to} للمطبخ ${kitchen?.name}` }); await load(); }
   }
 
   async function doReopen() {
@@ -48,10 +64,23 @@ export default function PeriodsPanel({ canManage, isAdmin }: { canManage: boolea
       <div style={{ marginTop: 10 }}>
         {msg && <div className={`alert ${msg.kind}`} style={{ marginBottom: 10 }} dir="auto">{msg.text}</div>}
         {canManage && (
-          <div className="form-row" style={{ marginBottom: 10 }}>
-            <label className="field"><span>From</span><input type="date" value={pFrom} onChange={(e) => setPFrom(e.target.value)} /></label>
-            <label className="field"><span>To</span><input type="date" value={pTo} min={pFrom} onChange={(e) => setPTo(e.target.value)} /></label>
-            <button className="btn" onClick={close}><Lock size={14} /> Close period</button>
+          <div style={{ marginBottom: 10 }} dir="auto">
+            <div className="form-row">
+              <label className="field"><span>From month</span><input type="month" value={mFrom} max={mTo} disabled={step !== 'idle'} onChange={(e) => setMFrom(e.target.value)} /></label>
+              <label className="field"><span>To month</span><input type="month" value={mTo} min={mFrom} disabled={step !== 'idle'} onChange={(e) => setMTo(e.target.value)} /></label>
+              <button className="btn" disabled={!range || step !== 'idle'} onClick={startClose}><Lock size={14} /> {step === 'downloading' ? 'Downloading…' : 'Download pages & close'}</button>
+              {step === 'downloading' && <span className="muted">{progress}</span>}
+            </div>
+            <div className="muted" style={{ marginTop: 6 }}>القفل بشهور كاملة بس{range ? ` (${range.from} → ${range.to})` : ''}. الأول بينزّل كل صفحات المطبخ للفترة دي Excel، وبعدها بيطلب تأكيد القفل. بعد القفل مفيش حد غير الـ Admin يضيف أو يعدّل أو يمسح فيها.</div>
+            {step === 'confirm' && range && (
+              <div className="alert warn" style={{ marginTop: 10 }}>
+                <div>اتنزّل ملف الصفحات. تأكيد قفل <b>{range.from} → {range.to}</b> للمطبخ <b>{kitchen?.name}</b>؟</div>
+                <div className="form-row" style={{ marginTop: 8 }}>
+                  <button className="btn" onClick={confirmClose}><Lock size={14} /> Confirm close</button>
+                  <button className="btn secondary" onClick={() => setStep('idle')}>Cancel</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
         {reopen && (

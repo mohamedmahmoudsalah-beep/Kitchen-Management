@@ -280,13 +280,13 @@ select testh.expect_err(format($$select public.close_period(%L, '2026-10-01', '2
 select testh.logout();
 select testh.login('mohamed.mahmoudsalah@breadfast.com');
 select public.close_period(:'k_plus'::uuid, '2026-10-01', '2026-10-31') as period_id \gset
-select testh.expect_err(format($$select public.close_period(%L, '2026-10-15', '2026-11-15')$$, :'k_plus'), '%conflicting key%');
+select testh.expect_err(format($$select public.close_period(%L, '2026-10-01', '2026-11-30')$$, :'k_plus'), '%conflicting key%');
 select testh.logout();
 
 select testh.login('ali@breadfast.com');
 select testh.stage('purchases', :'k_plus', '[{"date":"2026-10-10","code":"S3","qty":"1"}]'::jsonb) as p_locked \gset
 select testh.assert_eq('non-admin blocked in closed period',
-  (select count(*) from public.import_errors where batch_id = :'p_locked' and reason like '%للـ Admin بس%'), 1::bigint);
+  (select count(*) from public.import_errors where batch_id = :'p_locked' and reason like '%ارجع للـ Admin%'), 1::bigint);
 select testh.stage('purchases', :'k_plus', '[{"date":"2026-11-02","code":"S3","qty":"1"}]'::jsonb) as p_open \gset
 select testh.assert_eq('open period ok', (select status from public.import_batches where id = :'p_open'), 'validated');
 select testh.logout();

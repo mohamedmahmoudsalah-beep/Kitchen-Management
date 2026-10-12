@@ -77,9 +77,7 @@ select public.delete_draft(:'dd'::uuid);
 select testh.assert_eq('draft deleted', (select count(*) from public.documents where id = :'dd'), 0::bigint);
 
 -- فترة مقفولة (أكتوبر مقفول من اختبارات الدفعة 1)
-select public.save_document(null, 'PURCHASE', :'k_plus', '2026-10-15', null, jsonb_build_array(testh.line('T2', '1'))) as locked \gset
-select testh.expect_err(format($$select public.post_document(%L)$$, :'locked'), '%مقفولة%');
-select public.delete_draft(:'locked'::uuid);
+select testh.expect_err(format($$select public.save_document(null, 'PURCHASE', %L, '2026-10-15', null, jsonb_build_array(testh.line('T2', '1')))$$, :'k_plus'), '%مقفولة%');
 
 -- Warehouse Transaction: الرصيد المتاح (T2 = 100)
 select public.save_document(null, 'WH_TXN', :'k_plus', '2026-12-02', null, jsonb_build_array(testh.line('T2', '150'))) as wht_big \gset

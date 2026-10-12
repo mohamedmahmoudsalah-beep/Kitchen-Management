@@ -43,12 +43,13 @@ export function buildDocTable(docType: string, docs: ExportDoc[], lines: ExportL
 
   const rows: Cell[][] = [];
   const nameOf = opts.kitchenNameOf ?? (() => opts.kitchenName);
+  const kn = (d: ExportDoc) => (opts.kitchenNameOf ? opts.kitchenNameOf(d.kitchen_id) : opts.kitchenName);
   for (const d of docs) {
     const ls = (byDoc.get(d.id) ?? []).slice().sort((a, b) => a.line_no - b.line_no);
     const count = ls.length || d.document_lines?.[0]?.count || 0;
     const left: Cell[] = transfer
       ? [d.doc_no, d.doc_date, d.status, nameOf(d.kitchen_id), nameOf(d.counterpart_kitchen_id), count, d.note]
-      : [d.doc_no, d.doc_date, d.status, opts.kitchenName, count, d.note, d.override_reason];
+      : [d.doc_no, d.doc_date, d.status, kn(d), count, d.note, d.override_reason];
     if (!ls.length) { rows.push([...left, ...prod.map(() => null), ...tail.map(() => null)]); continue; }
     for (const l of ls) {
       const f = Number(l.uom_factor_snapshot) || 1;

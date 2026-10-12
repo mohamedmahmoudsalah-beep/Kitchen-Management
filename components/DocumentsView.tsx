@@ -9,6 +9,7 @@ import DocumentLines from '@/components/DocumentLines';
 import TemplateButton from '@/components/TemplateButton';
 import type { ImportModule } from '@/lib/import/columns';
 import ExportButtons from '@/components/ExportButtons';
+import { ymd } from '@/lib/export';
 import DocFilters from '@/components/DocFilters';
 import { fetchAllDocs, fetchDocPage, type DocQuery } from '@/lib/doc-query';
 import type { DocumentRow } from '@/lib/types';
@@ -65,7 +66,7 @@ export default function DocumentsView({ docType, importModule, canWrite, canReve
     <>
       {editor && kitchen && (
         <DocumentEditor key={editor.id ?? 'new'} docType={docType as EditorDocType} kitchenId={kitchenId} kitchenName={kitchen.name}
-          kitchens={kitchens} docId={editor.id} isAdmin={isAdmin} defaultDate={to}
+          kitchens={kitchens} docId={editor.id} isAdmin={isAdmin} defaultDate={ymd(new Date())}
           onClose={() => setEditor(null)} onChanged={(text) => { setEditor(null); setMsg({ kind: 'ok', text }); load(); }} />
       )}
       <div className="panel flush">
