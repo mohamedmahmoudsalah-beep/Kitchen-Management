@@ -7,8 +7,12 @@ import { useScope } from '@/components/ScopeProvider';
 import DocumentEditor from '@/components/DocumentEditor';
 import DocumentLines from '@/components/DocumentLines';
 import TemplateButton from '@/components/TemplateButton';
+import ExportButtons from '@/components/ExportButtons';
+import DocFilters from '@/components/DocFilters';
+import { fetchAllDocs, fetchDocPage, type DocQuery } from '@/lib/doc-query';
 import { fmt, toBase, toPieces, type QtyMode } from '@/lib/qty';
 import { ymd } from '@/lib/export';
+import type { Kitchen } from '@/lib/types';
 
 type TRow = {
   id: string; doc_no: string; doc_date: string; status: string; kitchen_id: string; counterpart_kitchen_id: string | null;
@@ -179,21 +183,40 @@ export default function TransfersView({ canWrite, canReverse, isAdmin, canImport
   const [cancel, setCancel] = useState<TRow | null>(null);
   const [reason, setReason] = useState('');
 
-  const name = (id: string | null) => kitchens.find((k) => k.id === id)?.name ?? '—';
+  // كل المطابخ الفعّالة (كوجهة/مرسل في التحويلات) — الـ Branch فوق بيفضل على مطابخ المستخدم بس
+  const [allKitchens, setAllKitchens] = useState<Kitchen[]>(kitchens);
+  useEffect(() => {
+    supabase.rpc('transfer_kitchens').then(({ data }) => { if (data) setAllKitchens(data as Kitchen[]); });
+  }, [supabase]);
+  const name = (id: string | null | undefined) => allKitchens.find((k) => k.id === id)?.name ?? '—';
+
+  const [q, setQ] = useState('');
+  const [status, setStatus] = useState('');
+  const [total, setTotal] = useState(0);
+  useEffect(() => { setStatus(''); }, [tab]);
+  // اللي في الفترة + أي حاجة لسه مفتوحة (مستني استلام / مرتجع معلق) حتى لو برا الفترة
+  const query: DocQuery = useMemo(() => ({
+    type: 'TRANSFER', kitchenId, from, to, mode: tab === 'out' ? 'own' : 'incoming', includeOpen: true, q, status,
+  }), [kitchenId, from, to, tab, q, status]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    let q = supabase.from('documents')
-      .select('id,doc_no,doc_date,status,kitchen_id,counterpart_kitchen_id,note,document_lines(count)')
-      .eq('doc_type', 'TRANSFER').is('reverses_document_id', null)
-      // اللي في الفترة + أي حاجة لسه مفتوحة (مستني استلام / مرتجع معلق) حتى لو برا الفترة
-      .or(`and(doc_date.gte.${from},doc_date.lte.${to}),status.in.(PENDING_RECEIPT,RETURN_PENDING)`)
-      .order('doc_date', { ascending: false }).order('created_at', { ascending: false }).limit(500);
-    q = tab === 'out' ? q.eq('kitchen_id', kitchenId) : q.eq('counterpart_kitchen_id', kitchenId).neq('status', 'DRAFT');
-    const { data, error } = await q;
-    if (error) setMsg({ kind: 'err', text: error.message }); else setRows((data ?? []) as unknown as TRow[]);
+    try {
+      const { rows: r, total: t } = await fetchDocPage(supabase, query, 0);
+      setRows(r as unknown as TRow[]); setTotal(t);
+    } catch (e) { setMsg({ kind: 'err', text: e instanceof Error ? e.message : String(e) }); }
     setLoading(false);
-  }, [supabase, kitchenId, from, to, tab]);
+    window.dispatchEvent(new Event('kms:transfers-changed'));
+  }, [supabase, query]);
+
+  async function loadMore() {
+    setLoading(true);
+    try {
+      const { rows: r, total: t } = await fetchDocPage(supabase, query, rows.length);
+      setRows((prev) => [...prev, ...(r as unknown as TRow[])]); setTotal(t);
+    } catch (e) { setMsg({ kind: 'err', text: e instanceof Error ? e.message : String(e) }); }
+    setLoading(false);
+  }
 
   useEffect(() => { load(); setEditor(null); setDialog(null); setCancel(null); }, [load]);
 
@@ -209,7 +232,7 @@ export default function TransfersView({ canWrite, canReverse, isAdmin, canImport
   return (
     <>
       {editor && kitchen && (
-        <DocumentEditor key={editor.id ?? 'new'} docType="TRANSFER" kitchenId={kitchenId} kitchenName={kitchen.name} kitchens={kitchens}
+        <DocumentEditor key={editor.id ?? 'new'} docType="TRANSFER" kitchenId={kitchenId} kitchenName={kitchen.name} kitchens={allKitchens}
           docId={editor.id} isAdmin={isAdmin} defaultDate={to} onClose={() => setEditor(null)} onChanged={done} />
       )}
       {dialog && <QtyDialog kind={dialog.kind} doc={dialog.doc} isAdmin={isAdmin} canAdjust={canAdjust} onClose={() => setDialog(null)} onDone={done} />}
@@ -220,12 +243,16 @@ export default function TransfersView({ canWrite, canReverse, isAdmin, canImport
             <button className={`tab ${tab === 'out' ? 'active' : ''}`} onClick={() => setTab('out')}>Outgoing</button>
             <button className={`tab ${tab === 'in' ? 'active' : ''}`} onClick={() => setTab('in')}>Incoming</button>
           </div>
-          <span className="muted" dir="auto">{kitchen?.name} · {tab === 'out' ? 'محوّل منه' : 'محوّل إليه'} · {rows.length}</span>
+          <span className="muted" dir="auto">{kitchen?.name} · {tab === 'out' ? 'محوّل منه' : 'محوّل إليه'} · {rows.length === total ? total : `${rows.length} من ${total}`}</span>
           <span className="spacer" />
+          <ExportButtons docType="TRANSFER" docs={rows} loadAll={() => fetchAllDocs(supabase, query)} kitchenName={kitchen?.name ?? ''} kitchenNameOf={name}
+            fileBase={`kitchens-transfer-${tab === 'out' ? 'outgoing' : 'incoming'}`} />
           {canImport && <TemplateButton module="transfers" />}
           {canImport && <Link className="btn secondary" href="/import-export?module=transfers"><FileUp size={14} /> Import from file</Link>}
           {canWrite && <button className="btn" onClick={() => { setEditor({ id: null }); setDialog(null); setMsg(null); setTab('out'); }}><Plus size={14} /> New transfer</button>}
         </div>
+        <DocFilters q={q} status={status} onQ={setQ} onStatus={setStatus}
+          statuses={Object.entries(STATUS).filter(([k]) => k !== 'POSTED' && (tab === 'out' || k !== 'DRAFT')).map(([value, v]) => ({ value, label: v.label }))} />
         {msg && <div className={`alert ${msg.kind}`} style={{ margin: 12 }} dir="auto">{msg.text}</div>}
         {cancel && (
           <div className="toolbar" style={{ background: 'var(--warn-soft)' }}>
@@ -274,6 +301,9 @@ export default function TransfersView({ canWrite, canReverse, isAdmin, canImport
             </tbody>
           </table>
         </div>
+        {rows.length < total && (
+          <div className="pager"><button className="btn secondary" disabled={loading} onClick={loadMore}>Load more ({total - rows.length} متبقي)</button></div>
+        )}
       </div>
     </>
   );

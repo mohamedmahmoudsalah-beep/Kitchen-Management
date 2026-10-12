@@ -4,6 +4,7 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Kitchen Management System',
   description: 'Breadfast kitchens inventory',
+  icons: { icon: '/breadfast-logo.png', apple: '/breadfast-logo.png' },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

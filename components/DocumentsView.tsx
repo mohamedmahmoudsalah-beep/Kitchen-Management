@@ -1,14 +1,16 @@
 'use client';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ChevronDown, ChevronRight, Download, FileUp, Pencil, Plus, Undo2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileUp, Pencil, Plus, Undo2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useScope } from '@/components/ScopeProvider';
 import DocumentEditor, { type EditorDocType } from '@/components/DocumentEditor';
 import DocumentLines from '@/components/DocumentLines';
 import TemplateButton from '@/components/TemplateButton';
 import type { ImportModule } from '@/lib/import/columns';
-import { downloadCsv, ymd } from '@/lib/export';
+import ExportButtons from '@/components/ExportButtons';
+import DocFilters from '@/components/DocFilters';
+import { fetchAllDocs, fetchDocPage, type DocQuery } from '@/lib/doc-query';
 import type { DocumentRow } from '@/lib/types';
 
 const STATUS_CLASS: Record<string, string> = { POSTED: 'ok', REVERSED: 'err', DRAFT: 'warn' };
@@ -27,16 +29,28 @@ export default function DocumentsView({ docType, importModule, canWrite, canReve
   const [open, setOpen] = useState<string | null>(null);
   const [editor, setEditor] = useState<{ id: string | null } | null>(null);
 
+  const [q, setQ] = useState('');
+  const [status, setStatus] = useState('');
+  const [total, setTotal] = useState(0);
+  const query: DocQuery = useMemo(() => ({ type: docType, kitchenId, from, to, q, status, reversals: true }), [docType, kitchenId, from, to, q, status]);
+
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('documents')
-      .select('id,doc_no,doc_type,doc_date,status,note,override_reason,reverses_document_id,created_at,document_lines(count)')
-      .eq('kitchen_id', kitchenId).eq('doc_type', docType)
-      .gte('doc_date', from).lte('doc_date', to)
-      .order('doc_date', { ascending: false }).order('created_at', { ascending: false }).limit(500);
-    if (error) setMsg({ kind: 'err', text: error.message }); else setRows((data ?? []) as unknown as DocumentRow[]);
+    try {
+      const { rows: r, total: t } = await fetchDocPage(supabase, query, 0);
+      setRows(r as unknown as DocumentRow[]); setTotal(t);
+    } catch (e) { setMsg({ kind: 'err', text: e instanceof Error ? e.message : String(e) }); }
     setLoading(false);
-  }, [supabase, kitchenId, docType, from, to]);
+  }, [supabase, query]);
+
+  async function loadMore() {
+    setLoading(true);
+    try {
+      const { rows: r, total: t } = await fetchDocPage(supabase, query, rows.length);
+      setRows((prev) => [...prev, ...(r as unknown as DocumentRow[])]); setTotal(t);
+    } catch (e) { setMsg({ kind: 'err', text: e instanceof Error ? e.message : String(e) }); }
+    setLoading(false);
+  }
 
   useEffect(() => { load(); setEditor(null); setRev(null); }, [load]);
 
@@ -56,17 +70,16 @@ export default function DocumentsView({ docType, importModule, canWrite, canReve
       )}
       <div className="panel flush">
         <div className="toolbar">
-          <span className="muted" dir="auto">{kitchen?.name} · {from} → {to} · {rows.length} مستند</span>
+          <span className="muted" dir="auto">{kitchen?.name} · {from} → {to} · {rows.length === total ? total : `${rows.length} من ${total}`} مستند</span>
+          {docType === 'PURCHASE' && !isAdmin && <span className="badge warn" title="بعد الـ Post المشتريات مينفعش تتعدل أو تتعكس غير بواسطة الـ Admin">Locked after post · Admin only</span>}
           <span className="spacer" />
           {manual && canWrite && <button className="btn" onClick={() => { setEditor({ id: null }); setMsg(null); }}><Plus size={14} /> New</button>}
           {canImport && importModule && <TemplateButton module={importModule as ImportModule} />}
           {canImport && importModule && <Link className="btn secondary" href={`/import-export?module=${importModule}`}><FileUp size={14} /> Import from file</Link>}
-          <button className="btn secondary" onClick={() => downloadCsv(`${docType.toLowerCase()}-${ymd(new Date())}.csv`,
-            ['Doc No', 'Date', 'Status', 'Lines', 'Note', 'Override reason'],
-            rows.map((r) => [r.doc_no, r.doc_date, r.status, r.document_lines?.[0]?.count ?? 0, r.note, r.override_reason]))}>
-            <Download size={14} /> CSV
-          </button>
+          <ExportButtons docType={docType} docs={rows} loadAll={() => fetchAllDocs(supabase, query)} kitchenName={kitchen?.name ?? ''} />
         </div>
+        <DocFilters q={q} status={status} onQ={setQ} onStatus={setStatus}
+          statuses={[{ value: 'DRAFT', label: 'Draft' }, { value: 'POSTED', label: 'Posted' }, { value: 'REVERSED', label: 'Reversed' }]} />
         {msg && <div className={`alert ${msg.kind}`} style={{ margin: 12 }} dir="auto">{msg.text}</div>}
         {rev && (
           <div className="toolbar" style={{ background: 'var(--warn-soft)' }}>
@@ -98,7 +111,7 @@ export default function DocumentsView({ docType, importModule, canWrite, canReve
                       {manual && canWrite && r.status === 'DRAFT' && (
                         <button className="btn secondary small" onClick={() => { setEditor({ id: r.id }); setMsg(null); }}><Pencil size={12} /> Edit</button>
                       )}{' '}
-                      {canReverse && r.status === 'POSTED' && !r.reverses_document_id && (
+                      {canReverse && (docType !== 'PURCHASE' || isAdmin) && r.status === 'POSTED' && !r.reverses_document_id && (
                         <button className="btn danger small" onClick={() => { setRev(r); setMsg(null); }}><Undo2 size={13} /> Reverse</button>
                       )}
                     </td>
@@ -106,10 +119,13 @@ export default function DocumentsView({ docType, importModule, canWrite, canReve
                   {open === r.id && <tr><td colSpan={7} style={{ background: '#fafbfd', padding: 8 }}><DocumentLines docId={r.id} /></td></tr>}
                 </Fragment>
               ))}
-              {!rows.length && <tr><td colSpan={7} className="empty">{loading ? 'Loading…' : 'No documents in this period'}</td></tr>}
+              {!rows.length && <tr><td colSpan={7} className="empty">{loading ? 'Loading…' : q || status ? 'مفيش نتايج للبحث ده' : 'No documents in this period'}</td></tr>}
             </tbody>
           </table>
         </div>
+        {rows.length < total && (
+          <div className="pager"><button className="btn secondary" disabled={loading} onClick={loadMore}>Load more ({total - rows.length} متبقي)</button></div>
+        )}
       </div>
     </>
   );

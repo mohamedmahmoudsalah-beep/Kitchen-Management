@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import ImportWizard from '@/components/ImportWizard';
+import BackupPanel from '@/components/BackupPanel';
 import { requirePage } from '@/lib/auth';
 import { MODULES, MODULE_ORDER, type ImportModule } from '@/lib/import/columns';
 
@@ -18,6 +19,7 @@ export default async function ImportExportPage() {
   return (
     <Suspense fallback={null}>
       <ImportWizard allowed={allowed} isAdmin={role === 'admin'} />
+      {role === 'admin' && <BackupPanel />}
     </Suspense>
   );
 }

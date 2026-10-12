@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useScope } from '@/components/ScopeProvider';
 import { downloadCsv, ymd } from '@/lib/export';
 import type { AuditRow } from '@/lib/types';
+import ProductCardView from '@/components/ProductCardView';
 
 const PAGE = 100;
 const TABLES = ['products', 'documents', 'periods', 'profiles', 'user_kitchens', 'user_pages', 'access_invites', 'kitchens'];
@@ -21,6 +22,7 @@ function summary(r: AuditRow): string {
 }
 
 export default function AuditView() {
+  const [view, setView] = useState<'log' | 'card'>('log');
   const supabase = useMemo(() => createClient(), []);
   const { kitchenId, kitchen, from, to } = useScope();
   const [table, setTable] = useState('');
@@ -67,7 +69,15 @@ export default function AuditView() {
   }
 
   const pages = Math.max(1, Math.ceil(count / PAGE));
+  const tabs = (
+    <div className="tabs" style={{ marginBottom: 12 }}>
+      <button className={`tab ${view === 'log' ? 'active' : ''}`} onClick={() => setView('log')}>Change log</button>
+      <button className={`tab ${view === 'card' ? 'active' : ''}`} onClick={() => setView('card')}>Product Card</button>
+    </div>
+  );
+  if (view === 'card') return <>{tabs}<ProductCardView /></>;
   return (
+    <>{tabs}
     <div className="panel flush">
       <div className="toolbar">
         <label className="muted">Table{' '}
@@ -103,5 +113,6 @@ export default function AuditView() {
         <button className="btn secondary small" disabled={page + 1 >= pages} onClick={() => setPage((p) => p + 1)}>Next</button>
       </div>
     </div>
+    </>
   );
 }

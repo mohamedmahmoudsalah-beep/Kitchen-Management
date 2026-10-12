@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import SignOutButton from '@/components/SignOutButton';
+import Logo from '@/components/Logo';
 
 export default async function PendingPage() {
   const supabase = await createClient();
@@ -12,7 +13,7 @@ export default async function PendingPage() {
   return (
     <div className="login-wrap">
       <div className="login-card">
-        <div className="logo">K</div>
+        <div style={{ display: 'grid', placeItems: 'center', marginBottom: 14 }}><Logo size={72} /></div>
         <h1>Waiting for activation</h1>
         <p className="muted" dir="auto">
           حسابك ({user.email}) اتسجل، بس لسه مستني الـ Admin أو المدير يوافق عليه ويديك المطابخ والصفحات. هتقدر تدخل أول ما يتأكد.

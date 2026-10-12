@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { explainAuthError } from '@/lib/auth-errors';
+import Logo from '@/components/Logo';
 
 export default function LoginPage() {
   const [err, setErr] = useState<string | null>(null);
@@ -34,7 +35,7 @@ export default function LoginPage() {
   return (
     <div className="login-wrap">
       <div className="login-card">
-        <div className="logo">K</div>
+        <div style={{ display: 'grid', placeItems: 'center', marginBottom: 14 }}><Logo size={72} /></div>
         <h1>Kitchen Management System</h1>
         <p className="muted" style={{ margin: 0 }}>Sign in with your Google account</p>
         {problem && (

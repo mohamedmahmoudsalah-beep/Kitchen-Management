@@ -182,7 +182,7 @@ export default function DocumentEditor({ docType, kitchenId, kitchenName, kitche
     setBusy(true); setErr(null);
     const saved = await save();
     if (saved) {
-      const { error } = await supabase.rpc('post_document', { p_doc: saved, p_override_reason: override.trim() || null, p_apply_count: applyCount });
+      const { error } = await supabase.rpc('post_document', { p_doc: saved, p_override_reason: override.trim() || null, p_apply_count: isAdmin ? applyCount : true });
       if (error) setErr(`${error.message} (الـ Draft اتحفظ)`);
       else { setBusy(false); onChanged(docType === 'TRANSFER' ? 'التحويل اتبعت (In Transit)' : 'اتعمل Post'); return; }
     }
@@ -289,12 +289,14 @@ export default function DocumentEditor({ docType, kitchenId, kitchenName, kitche
             </table>
           </div>
 
-          {docType === 'CLOSING' && (
+          {docType === 'CLOSING' && (isAdmin ? (
             <label className="checks" style={{ marginTop: 10 }} dir="auto">
               <span><input type="checkbox" checked={applyCount} onChange={(e) => setApplyCount(e.target.checked)} />{' '}
-                Apply count variances to stock (يسجّل الفروق عن رصيد الدفتر كتسوية Count Correction، والجرد ده يبقى Opening الفترة اللي بعده)</span>
+                Apply count variances to stock — Admin only (يسجّل الفروق عن رصيد الدفتر كتسوية Count Correction، والجرد ده يبقى Opening الفترة اللي بعده)</span>
             </label>
-          )}
+          ) : (
+            <div className="muted" style={{ marginTop: 10 }} dir="auto">الجرد بيترحّل تلقائيًا للفترة اللي بعده (فروقه بتتسجل Count Correction).</div>
+          ))}
           <div className="form-row" style={{ marginTop: 10 }}>
             <button className="btn secondary small" onClick={() => setLines((ls) => [...ls, newLine()])}><Plus size={13} /> Add line</button>
             {docType === 'CLOSING' && <button className="btn secondary small" onClick={loadStockList}><ListPlus size={13} /> Load stock list</button>}

@@ -42,6 +42,9 @@ select testh.assert_eq('warehouse stock March: opening 90 -> stock = counted 100
 
 -- بدون تطبيق الفروق على المخزون
 select public.save_document(null, 'CLOSING', :'k_nc7', '2027-04-30', 'no apply', jsonb_build_array(testh.line('N1', '5'))) as c_apr \gset
+select testh.expect_err(format($$select public.post_document(%L, null, false)$$, :'c_apr'), '%للـ Admin بس%');
+select testh.logout();
+select testh.login('mohamed.mahmoudsalah@breadfast.com');
 select public.post_document(:'c_apr'::uuid, null, false);
 select testh.logout();
 select testh.assert_eq('apply=false leaves stock untouched and creates no adjustment',

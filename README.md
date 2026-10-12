@@ -5,7 +5,8 @@
 ## 1) Supabase
 1. اعمل Project جديد (Free).
 2. **SQL Editor**: شغّل الملفات بالترتيب من `supabase/migrations/`:
-   `001_foundation.sql` ← `002_stock_engine.sql` ← `003_import.sql` ← `004_grants.sql` ← `005_data_product_v2_reasons.sql` ← `006_batch2_entry_transfers_closing_reports.sql` ← `007_batch3_closing_opening_writeoff_transfers_import.sql` ← `008_open_signup_manager_approval.sql`
+   `001_foundation.sql` ← `002_stock_engine.sql` ← `003_import.sql` ← `004_grants.sql` ← `005_data_product_v2_reasons.sql` ← `006_batch2_entry_transfers_closing_reports.sql` ← `007_batch3_closing_opening_writeoff_transfers_import.sql` ← `008_open_signup_manager_approval.sql` ← `009_batch4_transfer_targets_purchase_lock_opening_zero_product_card.sql` ← `010_batch4_1_zero_everywhere_closing_carry_admin.sql` ← `011_batch5_documents_search.sql`
+   - لو كنت شغّلت لحد 010: شغّل `011` بس. لو لحد 009: `010` ثم `011`. ولو لحد 008: `009` ثم `010` ثم `011`.
    - لو كنت شغّلت لحد 007 قبل كده: شغّل `008` بس (بيحدّث الموجود ومش بيمسح داتا).
    - `005` لحد `008` بيعيدوا تطبيق الـ grants في آخرهم، فمفيش داعي تشغّل 004 تاني.
 3. **Authentication → Providers**: فعّل **Google** (محتاج OAuth Client من Google Cloud Console).
@@ -39,6 +40,21 @@ Import الـ repo، وضيف المتغيرين `NEXT_PUBLIC_SUPABASE_URL` و `
 - **Stock Ledger append-only**، والأرصدة في `stock_balances` عليها `CHECK (qty_base >= 0)`.
 - **كل مطبخ = Location مخزون واحد** (WAREHOUSE). `IN_TRANSIT` و`RETURN_PENDING` محجوزين للتحويلات (الدفعة 2).
 - Schema جاهز لـ V2: `odoo_po_id`, `odoo_ref`, `odoo_po_line_id`, `qty_ordered_base`.
+
+## الدفعة 5 (011)
+- **قوايم المستندات والتحويلات من غير حد 500**: ترقيم صفحات (100 في المرة + Load more) وبحث بالـ Doc No / الملاحظة / كود أو اسم منتج + فلتر الحالة. الـ Export بيطلّع كل المستندات المطابقة مش بس اللي على الشاشة.
+- **عدّاد في الـ Sidebar على Kitchens Transfer**: تحويلات واردة مستنية استلام + مرتجعات معلّقة.
+- **Backup للـ Admin** (Import/Export ← Backup): ZIP فيه CSV لكل الجداول. النسخة المجانية مفيهاش Backups تلقائية — اعمله أسبوعيًا واحتفظ بالملف بره النظام.
+
+## الدفعة 4 (009)
+- **Kitchens Transfer**: المستخدم يقدر يحوّل لأي مطبخ فعّال (الـ Branch فوق بيفضل على مطابخه بس)، وأسماء المرسل/المستلم بتظهر صح.
+- **Product picker**: القايمة بتظهر فوق الجداول (مبتتقصش)، بتعرض الكود والـ Generic والاسم وعدد الكيلو في كود السيستم، وبتشتغل بالأسهم و Enter.
+- **Export (Excel + CSV) لكل صفحات المستندات** (Purchases, Waste, Closing, Adjustments, Warehouse Txn, Opening, Kitchens Transfer): صف لكل صنف مع Doc No / Date / Status / Lines / Note.
+- **المشتريات بعد الـ Post**: Reverse/تعديل للـ Admin بس (مفروض في الـ DB).
+- **الصفر في الـ Import مسموح في كل الصفحات** (010): السطر بيتسجل في المستند ومفيش حركة على الرصيد (في التحويل السطر الصفري مبيتبعتش). السالب لسه مرفوض (إلا Adjustments بالإشارة).
+- **ترحيل الجرد للفترة اللي بعده** (Apply count variances) إيقافه للـ Admin بس؛ غيره بيترحّل تلقائيًا.
+- **Audit Log → Product Card**: اختار منتج وشوف كل حركة (زيادة/نقص، الكمية بالكيلو والقطع، الرصيد بعدها، مين عملها)، مع Export.
+- **اللوجو**: حط ملف اللوجو في `public/breadfast-logo.png` (بيظهر في الـ Sidebar وتسجيل الدخول وصفحة الانتظار والـ favicon).
 
 ## الدفعة 3
 - **الجرد = Opening الفترة اللي بعدها** (جرد يناير = Opening فبراير): لما تعمل Post لجرد، الفرق بين الكمية المجرودة ورصيد الدفتر (لحد تاريخ الجرد) بيتسجل تلقائيًا كتسوية **Count Correction** مربوطة بالجرد، فرصيد المخزن = الجرد، وأي فترة بعدها بتبدأ منه. ممكن تقفل الخيار ده وقت الـ Post. Reverse للجرد بيعكس تسوية فروقه معاه. المنتجات اللي مش في الجرد مش بتتعدل في المخزون (بس بتتحسب Closing = 0 في تقرير الاستهلاك)، استخدم "Load stock list" عشان تجرد كل حاجة.

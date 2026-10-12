@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   LayoutDashboard, PackageOpen, ShoppingCart, ArrowLeftRight, Warehouse, Trash2, ClipboardCheck,
   Flame, Boxes, SlidersHorizontal, Database, FileUp, FileWarning, ShieldCheck, ScrollText,
@@ -11,6 +11,7 @@ import type { Kitchen, PageDef } from '@/lib/types';
 import { GLOBAL_PAGES, NAV_GROUPS, PAGE_HREF } from '@/lib/nav';
 import { ScopeProvider, useScope } from '@/components/ScopeProvider';
 import { createClient } from '@/lib/supabase/client';
+import Logo from '@/components/Logo';
 
 const ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
   dashboard: LayoutDashboard, opening_balance: PackageOpen, purchases: ShoppingCart, kitchens_transfer: ArrowLeftRight,
@@ -33,10 +34,33 @@ function Sidebar({ pages, email }: { pages: PageDef[]; email: string }) {
   const byKey = useMemo(() => new Map(pages.map((p) => [p.key, p])), [pages]);
   const needle = q.trim().toLowerCase();
 
+  // عدّاد التحويلات: واردة مستنية تأكيد استلام + مرتجعات معلّقة لازم المرسل يأكدها
+  const { kitchens } = useScope();
+  const hasTransfers = byKey.has('kitchens_transfer');
+  const [pending, setPending] = useState({ incoming: 0, returns: 0 });
+  const refreshPending = useCallback(async () => {
+    if (!hasTransfers || !kitchens.length) return;
+    const sb = createClient();
+    const ids = kitchens.map((k) => k.id);
+    const [inc, ret] = await Promise.all([
+      sb.from('documents').select('id', { count: 'exact', head: true }).eq('doc_type', 'TRANSFER').eq('status', 'PENDING_RECEIPT').in('counterpart_kitchen_id', ids),
+      sb.from('documents').select('id', { count: 'exact', head: true }).eq('doc_type', 'TRANSFER').eq('status', 'RETURN_PENDING').in('kitchen_id', ids),
+    ]);
+    setPending({ incoming: inc.count ?? 0, returns: ret.count ?? 0 });
+  }, [hasTransfers, kitchens]);
+  useEffect(() => {
+    refreshPending();
+    const t = setInterval(refreshPending, 60000);
+    window.addEventListener('focus', refreshPending);
+    window.addEventListener('kms:transfers-changed', refreshPending);
+    return () => { clearInterval(t); window.removeEventListener('focus', refreshPending); window.removeEventListener('kms:transfers-changed', refreshPending); };
+  }, [refreshPending, path]);
+  const pendingTotal = pending.incoming + pending.returns;
+
   return (
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="brand">
-        <span className="logo">K</span>
+        <Logo size={30} />
         <span className="label">Kitchens</span>
         <button className="icon-btn" style={{ marginLeft: 'auto' }} onClick={() => setCollapsed((c) => !c)} title="Toggle sidebar">
           {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
@@ -58,6 +82,9 @@ function Sidebar({ pages, email }: { pages: PageDef[]; email: string }) {
                 return (
                   <Link key={p.key} href={PAGE_HREF[p.key]} className={`nav-item ${activeKey === p.key ? 'active' : ''}`} title={p.title}>
                     {Icon && <Icon size={16} />}<span className="label">{p.title}</span>
+                    {p.key === 'kitchens_transfer' && pendingTotal > 0 && (
+                      <span className="nav-badge" title={`${pending.incoming} تحويل وارد مستني استلام · ${pending.returns} مرتجع معلّق`}>{pendingTotal > 99 ? '99+' : pendingTotal}</span>
+                    )}
                   </Link>
                 );
               })}
