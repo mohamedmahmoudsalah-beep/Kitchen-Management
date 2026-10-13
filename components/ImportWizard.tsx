@@ -10,7 +10,7 @@ import { MODULES, MODULE_ORDER, mapRows, FIELD_LABEL, type ImportModule, type Ma
 import { readTable } from '@/lib/import/parse-file';
 import { downloadCsv, ymd } from '@/lib/export';
 import TemplateButton from '@/components/TemplateButton';
-import { applyChoices, findAmbiguous, lastPurchased, loadProductsForCodes, type Ambig } from '@/lib/import/ambiguous';
+import { applyChoices, findAmbiguous, initialChoices, lastPurchased, loadProductsForCodes, type Ambig } from '@/lib/import/ambiguous';
 
 type Phase = 'idle' | 'parsed' | 'validating' | 'invalid' | 'valid' | 'committing' | 'done';
 type ErrRow = { row_no: number; column_name: string | null; reason: string; raw: Record<string, unknown> | null };
@@ -76,9 +76,7 @@ export default function ImportWizard({ allowed, isAdmin, fixedModule, initialMod
           const amb = findAmbiguous(m.rows, prods);
           const lp = await lastPurchased(supabase, amb.map((a) => a.code));
           setAmbig(amb); setLast(lp);
-          setChoices(Object.fromEntries(amb.flatMap((a) => {
-            const l = lp[a.code]?.syt; return l && a.options.some((o) => o.syt_code === l) ? [[a.code, l]] : [];
-          })));
+          setChoices(initialChoices(amb, lp));
         } finally { setResolving(false); }
       }
     } catch (e) {
@@ -151,6 +149,8 @@ export default function ImportWizard({ allowed, isAdmin, fixedModule, initialMod
   }
 
   const missingText = parsed?.missing.map((k) => FIELD_LABEL[k] ?? k).join(', ');
+  const toChoose = ambig.filter((a) => !a.same);                       // أحجام مختلفة: المستخدم يختار
+  const autoCount = ambig.length - toChoose.length;                    // أحجام متطابقة: اتختار تلقائيًا
   const unresolved = ambig.filter((a) => !choices[a.code]).length;
   const canValidate = !!parsed && parsed.missing.length === 0 && parsed.rows.length > 0 && !busy && !resolving && unresolved === 0
     && (!spec.needsKitchen || !!kitchen) && (phase === 'parsed' || phase === 'invalid' || phase === 'valid');
@@ -227,14 +227,15 @@ export default function ImportWizard({ allowed, isAdmin, fixedModule, initialMod
             )}
             {parsed.rows.length === 0 && parsed.missing.length === 0 && <div className="alert err" style={{ marginTop: 8 }}>الملف مفيهوش صفوف داتا</div>}
             {resolving && <div className="muted" style={{ marginTop: 8 }}>بفحص الأكواد المتكررة…</div>}
-            {ambig.length > 0 && (
+            {autoCount > 0 && <div className="muted" style={{ marginTop: 8 }} dir="auto">{autoCount} كود أحجامهم متطابقة (نفس الـ UOM والـ base) واتختار لهم حجم تلقائيًا.</div>}
+            {toChoose.length > 0 && (
               <div className="alert warn" style={{ marginTop: 10 }} dir="auto">
-                <b>{ambig.length} كود بيطابق أكتر من حجم (Syt Code).</b> اختار الحجم لكل كود — الحجم اللي اتشترى بيه آخر مرة متختار تلقائيًا. مش لازم ترفع الملف من جديد.
+                <b>{toChoose.length} كود بيطابق أحجام مختلفة (UOM أو base مختلف).</b> اختار الحجم لكل كود — الحجم اللي اتشترى بيه آخر مرة متختار تلقائيًا. مش لازم ترفع الملف من جديد.
                 <div className="table-wrap" style={{ marginTop: 8, maxHeight: 360 }}>
                   <table className="grid">
                     <thead><tr><th>Code (Generic)</th><th className="num">Rows</th><th>Size to use</th><th>Last purchased</th></tr></thead>
                     <tbody>
-                      {ambig.map((a) => (
+                      {toChoose.map((a) => (
                         <tr key={a.code}>
                           <td className="mono">{a.code}</td>
                           <td className="num">{a.rowCount}</td>

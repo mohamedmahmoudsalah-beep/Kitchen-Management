@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyChoices, findAmbiguous, type Prod } from '@/lib/import/ambiguous';
+import { applyChoices, findAmbiguous, initialChoices, type Prod } from '@/lib/import/ambiguous';
 import { monthRange } from '@/lib/months';
 import { mapRows, MODULES } from '@/lib/import/columns';
 import { reportTable } from '@/lib/archive';
@@ -34,6 +34,29 @@ describe('ambiguous generic codes', () => {
     const amb = findAmbiguous(m.rows, products);
     expect(amb.map((x) => [x.code, x.rowCount])).toEqual([['RM0015', 2], ['RM0056', 1]]);
     expect(applyChoices(m.rows, { RM0015: 'RM0015-C' })[0].data.code).toBe('RM0015-C');
+  });
+});
+
+describe('same-size options are chosen automatically', () => {
+  const mk = (id: string, syt: string, f: number, u: string): Prod => ({ id, syt_code: syt, generic_code: 'RM0312', name: 'Tomato Paste', uom_factor: f, uom_name: u, is_active: true });
+  const rows = [{ row_no: 2, data: { code: 'RM0312' } }];
+  it('flags same=true when UOM and base are identical', () => {
+    const a = findAmbiguous(rows, [mk('1', 'RM0312-A', 2.8, 'can'), mk('2', 'RM0312-B', 2.8, 'can')]);
+    expect(a[0].same).toBe(true);
+    expect(initialChoices(a, {})).toEqual({ RM0312: 'RM0312-A' });
+  });
+  it('prefers the last purchased one when sizes are identical', () => {
+    const a = findAmbiguous(rows, [mk('1', 'RM0312-A', 2.8, 'can'), mk('2', 'RM0312-B', 2.8, 'can')]);
+    expect(initialChoices(a, { RM0312: { syt: 'RM0312-B', date: '2026-09-01' } })).toEqual({ RM0312: 'RM0312-B' });
+  });
+  it('asks when base differs', () => {
+    const a = findAmbiguous(rows, [mk('1', 'RM0312-A', 2.8, 'can'), mk('2', 'RM0312-B', 5, 'can')]);
+    expect(a[0].same).toBe(false);
+    expect(initialChoices(a, {})).toEqual({});
+  });
+  it('asks when UOM name differs even if base is the same', () => {
+    const a = findAmbiguous(rows, [mk('1', 'RM0312-A', 2.8, 'can'), mk('2', 'RM0312-B', 2.8, 'bag')]);
+    expect(a[0].same).toBe(false);
   });
 });
 
