@@ -157,7 +157,7 @@ select testh.stage('opening', :'k_plus', '[
 ]'::jsonb) as ob_bad \gset
 select testh.assert_eq('opening bad: 4 errors', (select error_count from public.import_batches where id = :'ob_bad'), 4);
 select testh.assert_eq('ambiguous generic code flagged',
-  (select count(*) from public.import_errors where batch_id = :'ob_bad' and row_no = 2 and reason like '%بيطابق 2 منتجات%'), 1::bigint);
+  (select count(*) from public.import_errors where batch_id = :'ob_bad' and row_no = 2 and reason like '%بيطابق 2 أحجام%'), 1::bigint);
 select testh.assert_eq('errors carry row_no + raw',
   (select raw ->> 'code' from public.import_errors where batch_id = :'ob_bad' and row_no = 3), 'NOPE');
 select testh.assert_eq('opening bad: no documents', (select count(*) from public.documents), 0::bigint);

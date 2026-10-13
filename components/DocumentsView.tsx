@@ -1,7 +1,7 @@
 'use client';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ChevronDown, ChevronRight, FileUp, Pencil, Plus, Undo2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileUp, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useScope } from '@/components/ScopeProvider';
 import DocumentEditor, { type EditorDocType } from '@/components/DocumentEditor';
@@ -30,6 +30,7 @@ export default function DocumentsView({ docType, importModule, canWrite, canReve
   const [open, setOpen] = useState<string | null>(null);
   const [editor, setEditor] = useState<{ id: string | null } | null>(null);
 
+  const [del, setDel] = useState<DocumentRow | null>(null);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [total, setTotal] = useState(0);
@@ -54,6 +55,17 @@ export default function DocumentsView({ docType, importModule, canWrite, canReve
   }
 
   useEffect(() => { load(); setEditor(null); setRev(null); }, [load]);
+
+  async function deleteClosing() {
+    if (!del) return;
+    const { data, error } = await supabase.rpc('delete_closing', { p_doc: del.id, p_reason: reason });
+    if (error) setMsg({ kind: 'err', text: error.message });
+    else {
+      const r = data as { doc_no: string; documents_deleted: number };
+      setMsg({ kind: 'ok', text: `اتمسح الجرد ${r.doc_no} (${r.documents_deleted} مستند بتسوية فروقه) والرصيد رجع زي ما كان` });
+      setDel(null); setReason(''); await load();
+    }
+  }
 
   async function reverse() {
     if (!rev) return;
@@ -82,6 +94,14 @@ export default function DocumentsView({ docType, importModule, canWrite, canReve
         <DocFilters q={q} status={status} onQ={setQ} onStatus={setStatus}
           statuses={[{ value: 'DRAFT', label: 'Draft' }, { value: 'POSTED', label: 'Posted' }, { value: 'REVERSED', label: 'Reversed' }]} />
         {msg && <div className={`alert ${msg.kind}`} style={{ margin: 12 }} dir="auto">{msg.text}</div>}
+        {del && (
+          <div className="toolbar" style={{ background: 'var(--err-soft, #fdecec)' }}>
+            <span dir="auto">مسح الجرد <b>{del.doc_no}</b> نهائيًا (مع تسوية فروقه) — السبب:</span>
+            <input type="text" value={reason} onChange={(e) => setReason(e.target.value)} dir="auto" style={{ width: 280 }} autoFocus />
+            <button className="btn danger small" disabled={!reason.trim()} onClick={deleteClosing}><Trash2 size={13} /> Delete</button>
+            <button className="btn secondary small" onClick={() => { setDel(null); setReason(''); }}>Cancel</button>
+          </div>
+        )}
         {rev && (
           <div className="toolbar" style={{ background: 'var(--warn-soft)' }}>
             <span dir="auto">Reverse <b>{rev.doc_no}</b> — السبب:</span>
@@ -111,6 +131,9 @@ export default function DocumentsView({ docType, importModule, canWrite, canReve
                     <td style={{ whiteSpace: 'nowrap' }}>
                       {manual && canWrite && r.status === 'DRAFT' && (
                         <button className="btn secondary small" onClick={() => { setEditor({ id: r.id }); setMsg(null); }}><Pencil size={12} /> Edit</button>
+                      )}{' '}
+                      {docType === 'CLOSING' && isAdmin && !r.reverses_document_id && (r.status === 'POSTED' || r.status === 'REVERSED') && (
+                        <button className="btn danger small" title="مسح الجرد نهائيًا (Admin بس، حتى لو الفترة مقفولة)" onClick={() => { setDel(r); setRev(null); setReason(''); setMsg(null); }}><Trash2 size={13} /> Delete</button>
                       )}{' '}
                       {canReverse && (docType !== 'PURCHASE' || isAdmin) && r.status === 'POSTED' && !r.reverses_document_id && (
                         <button className="btn danger small" onClick={() => { setRev(r); setMsg(null); }}><Undo2 size={13} /> Reverse</button>

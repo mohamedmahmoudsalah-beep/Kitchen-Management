@@ -58,8 +58,8 @@ export default function ArchivePurgePanel() {
     <div className="panel" style={{ marginTop: 16 }} dir="auto">
       <h2 style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Trash2 size={18} /> أرشفة ومسح شهور قديمة (Admin)</h2>
       <p className="muted">
-        بتمسح مستندات وحركات وسجل Audit شهور قديمة من كل المطابخ عشان الداتا بيز متكبرش. شروط: شهور كاملة، قبل الشهر الحالي، ومقفولة في كل مطبخ فيه حركة فيها، ومفيش تحويل مفتوح.
-        الأول بتنزّل الصفحات (Excel)، وبعدها تكتب جملة التأكيد. الرصيد بيتحفظ كمستند ترحيل واحد لكل مطبخ، فالشهور اللي بعدها مبتتأثرش. الـ Product Card للشهور المحذوفة هيبقى سطر ترحيل واحد.
+        بتمسح مستندات وحركات وسجل Audit شهور قديمة من كل المطابخ عشان الداتا بيز متكبرش. شروط: شهور كاملة قبل الشهر الحالي، ومفيش تحويل مفتوح. مش لازم الفترة تكون مقفولة.
+        الأول بتنزّل الصفحات (Excel)، وبعدها تكتب جملة التأكيد. الرصيد بيتحفظ كمستند ترحيل واحد لكل مطبخ فالشهور اللي بعدها مبتتأثرش، والفترة المحذوفة بتتقفل تلقائيًا في كل المطابخ. الـ Product Card للشهور المحذوفة هيبقى سطر ترحيل واحد.
       </p>
       <div className="form-row">
         <label className="field"><span>From month</span><input type="month" value={mFrom} max={mTo || curMonth()} onChange={(e) => { setMFrom(e.target.value); reset(); }} /></label>

@@ -54,8 +54,7 @@ select testh.login('ku70@breadfast.com');
 select testh.expect_err($$select public.purge_preview('2026-02-01', '2026-03-31')$$, '%Admin بس%');
 select testh.logout();
 select testh.login('mohamed.mahmoudsalah@breadfast.com');
-select testh.assert_eq('April is not closed -> blocked',
-  (select (public.purge_preview('2026-04-01', '2026-04-30') ->> 'ok')::text || '/' || (public.purge_preview('2026-04-01', '2026-04-30') -> 'blockers' ->> 0 like '%مش مقفولة%')::text), 'false/true');
+select testh.assert_eq('April (not closed) is allowed now, with a counts preview', (public.purge_preview('2026-04-01', '2026-04-30') ->> 'ok'), 'true');
 select testh.expect_err($$select public.purge_range('2026-02-01', '2026-03-31', 'nope')$$, '%التأكيد غلط%');
 select testh.expect_err($$select public.purge_range('2026-10-01', '2026-10-31', 'PURGE 2026-10 → 2026-10')$$, '%الشهر الحالي%');
 select testh.expect_err($$select public.purge_range('2026-02-05', '2026-03-31', 'x')$$, '%شهور كاملة%');
