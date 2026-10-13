@@ -3,9 +3,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type Prod = { id: string; syt_code: string; generic_code: string | null; name: string; uom_factor: number; is_active: boolean };
 export type Ambig = { code: string; rowCount: number; options: Prod[] };
-export type Row = Record<string, unknown>;
+// نفس شكل الصفوف اللي بيرجّعها mapRows: { row_no, data: { code, qty, ... } }
+export type Row = { row_no: number; data: Record<string, string> };
 
-const codeOf = (r: Row) => String(r.code ?? '').trim();
+const codeOf = (r: Row) => String(r.data?.code ?? '').trim();
 
 export function findAmbiguous(rows: Row[], products: Prod[]): Ambig[] {
   const counts = new Map<string, number>();
@@ -20,7 +21,7 @@ export function findAmbiguous(rows: Row[], products: Prod[]): Ambig[] {
 }
 
 export function applyChoices(rows: Row[], choices: Record<string, string>): Row[] {
-  return rows.map((r) => { const c = choices[codeOf(r)]; return c ? { ...r, code: c } : r; });
+  return rows.map((r) => { const c = choices[codeOf(r)]; return c ? { ...r, data: { ...r.data, code: c } } : r; });
 }
 
 export async function loadProductsForCodes(sb: SupabaseClient, rows: Row[]): Promise<Prod[]> {

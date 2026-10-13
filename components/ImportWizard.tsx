@@ -41,6 +41,7 @@ export default function ImportWizard({ allowed, isAdmin, fixedModule, initialMod
   const [message, setMessage] = useState<{ kind: 'err' | 'ok'; text: string } | null>(null);
 
   const [batchKitchen, setBatchKitchen] = useState('');
+  const [resolving, setResolving] = useState(false);
   const [ambig, setAmbig] = useState<Ambig[]>([]);
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [last, setLast] = useState<Record<string, { syt: string; date: string }>>({});
@@ -69,13 +70,16 @@ export default function ImportWizard({ allowed, isAdmin, fixedModule, initialMod
       setPhase('parsed');
       // أكواد بتطابق أكتر من حجم: نقترح آخر حجم اتشترى ونسيب المستخدم يختار
       if (spec.needsKitchen && m.missing.length === 0 && m.rows.length > 0) {
-        const prods = await loadProductsForCodes(supabase, m.rows);
-        const amb = findAmbiguous(m.rows, prods);
-        const lp = await lastPurchased(supabase, amb.map((a) => a.code));
-        setAmbig(amb); setLast(lp);
-        setChoices(Object.fromEntries(amb.flatMap((a) => {
-          const l = lp[a.code]?.syt; return l && a.options.some((o) => o.syt_code === l) ? [[a.code, l]] : [];
-        })));
+        setResolving(true);
+        try {
+          const prods = await loadProductsForCodes(supabase, m.rows);
+          const amb = findAmbiguous(m.rows, prods);
+          const lp = await lastPurchased(supabase, amb.map((a) => a.code));
+          setAmbig(amb); setLast(lp);
+          setChoices(Object.fromEntries(amb.flatMap((a) => {
+            const l = lp[a.code]?.syt; return l && a.options.some((o) => o.syt_code === l) ? [[a.code, l]] : [];
+          })));
+        } finally { setResolving(false); }
       }
     } catch (e) {
       setMessage({ kind: 'err', text: e instanceof Error ? e.message : 'مقدرتش أقرا الملف' });
@@ -148,7 +152,7 @@ export default function ImportWizard({ allowed, isAdmin, fixedModule, initialMod
 
   const missingText = parsed?.missing.map((k) => FIELD_LABEL[k] ?? k).join(', ');
   const unresolved = ambig.filter((a) => !choices[a.code]).length;
-  const canValidate = !!parsed && parsed.missing.length === 0 && parsed.rows.length > 0 && !busy && unresolved === 0
+  const canValidate = !!parsed && parsed.missing.length === 0 && parsed.rows.length > 0 && !busy && !resolving && unresolved === 0
     && (!spec.needsKitchen || !!kitchen) && (phase === 'parsed' || phase === 'invalid' || phase === 'valid');
 
   return (
@@ -222,6 +226,7 @@ export default function ImportWizard({ allowed, isAdmin, fixedModule, initialMod
               <div className="alert err" style={{ marginTop: 8 }} dir="auto">أعمدة مطلوبة ناقصة في الملف: <b>{missingText}</b></div>
             )}
             {parsed.rows.length === 0 && parsed.missing.length === 0 && <div className="alert err" style={{ marginTop: 8 }}>الملف مفيهوش صفوف داتا</div>}
+            {resolving && <div className="muted" style={{ marginTop: 8 }}>بفحص الأكواد المتكررة…</div>}
             {ambig.length > 0 && (
               <div className="alert warn" style={{ marginTop: 10 }} dir="auto">
                 <b>{ambig.length} كود بيطابق أكتر من حجم (Syt Code).</b> اختار الحجم لكل كود — الحجم اللي اتشترى بيه آخر مرة متختار تلقائيًا. مش لازم ترفع الملف من جديد.

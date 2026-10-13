@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyChoices, findAmbiguous, type Prod } from '@/lib/import/ambiguous';
 import { monthRange } from '@/lib/months';
+import { mapRows, MODULES } from '@/lib/import/columns';
 import { reportTable } from '@/lib/archive';
 import { buildDocTable, type ExportDoc, type ExportLine } from '@/lib/doc-export';
 
@@ -8,7 +9,8 @@ const p = (id: string, syt: string, gen: string | null, f = 1, active = true): P
 
 describe('ambiguous generic codes', () => {
   const prods = [p('1', 'S1', 'G1', 1), p('2', 'S2', 'G1', 5), p('3', 'S3', 'G2'), p('4', 'S4', 'G3', 1), p('5', 'S5', 'G3', 2, false)];
-  const rows = [{ code: 'G1', qty: 1 }, { code: 'G1', qty: 2 }, { code: 'G2', qty: 3 }, { code: 'S1', qty: 4 }];
+  const r = (n: number, code: string) => ({ row_no: n, data: { code, qty: '1' } });
+  const rows = [r(2, 'G1'), r(3, 'G1'), r(4, 'G2'), r(5, 'S1')];
   it('flags only codes that match more than one product', () => {
     const a = findAmbiguous(rows, prods);
     expect(a.map((x) => x.code)).toEqual(['G1']);
@@ -16,13 +18,22 @@ describe('ambiguous generic codes', () => {
     expect(a[0].options.map((o) => o.syt_code)).toEqual(['S1', 'S2']);
   });
   it('lists only active sizes in the options', () => {
-    const a = findAmbiguous([{ code: 'G3' }], prods);
+    const a = findAmbiguous([r(2, 'G3')], prods);
     expect(a[0].options.map((o) => o.syt_code)).toEqual(['S4']);
   });
   it('applies the chosen Syt code to every row with that code', () => {
     const out = applyChoices(rows, { G1: 'S2' });
-    expect(out.map((r) => r.code)).toEqual(['S2', 'S2', 'G2', 'S1']);
-    expect(rows[0].code).toBe('G1');
+    expect(out.map((x) => x.data.code)).toEqual(['S2', 'S2', 'G2', 'S1']);
+    expect(out[0].row_no).toBe(2);
+    expect(rows[0].data.code).toBe('G1');
+  });
+  it('works on rows produced by mapRows from a real sheet (Code column)', () => {
+    const table = [['Date', 'Code', 'Qty'], ['2026-09-01', 'RM0015', 5], ['2026-09-01', 'RM0015', 2], ['2026-09-02', 'RM0056', 1]];
+    const m = mapRows(table, MODULES.purchases);
+    const products = [p('a', 'RM0015-B', 'RM0015'), p('b', 'RM0015-C', 'RM0015'), p('c', 'RM0056', 'RM0056'), p('d', 'RM0056-C', 'RM0056')];
+    const amb = findAmbiguous(m.rows, products);
+    expect(amb.map((x) => [x.code, x.rowCount])).toEqual([['RM0015', 2], ['RM0056', 1]]);
+    expect(applyChoices(m.rows, { RM0015: 'RM0015-C' })[0].data.code).toBe('RM0015-C');
   });
 });
 
