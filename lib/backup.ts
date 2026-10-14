@@ -11,7 +11,7 @@ export const BACKUP_TABLES: BackupTable[] = [
   { name: 'access_invites', key: ['email'] },
   { name: 'documents', key: ['id'] }, { name: 'document_lines', key: ['id'] }, { name: 'transfer_lines', key: ['line_id'] },
   { name: 'stock_ledger', key: ['id'], heavy: true }, { name: 'stock_balances', key: ['kitchen_id', 'location', 'product_id'] },
-  { name: 'stock_levels', key: ['id'] },
+  { name: 'stock_levels', key: ['id'] }, { name: 'document_line_edits', key: ['id'] },
   { name: 'audit_log', key: ['id'], heavy: true },
 ];
 

@@ -6,6 +6,11 @@ import { xlsxBytes } from '@/lib/export';
 import { makeZip } from '@/lib/zip';
 import type { Kitchen } from '@/lib/types';
 
+// جمل التأكيد (لازم تطابق اللي في الـ DB بالظبط)
+export const purgePhrase = (fromMonth: string, toMonth: string, kitchenCode?: string | null) =>
+  `PURGE ${fromMonth} → ${toMonth}${kitchenCode ? ` @ ${kitchenCode}` : ''}`;
+export const clearPagePhrase = (page: string, kitchenCode?: string | null) => `CLEAR ${page} @ ${kitchenCode ?? 'ALL'}`;
+
 export const ARCHIVE_PAGES = [
   { type: 'OPENING', title: 'Opening Balance' }, { type: 'PURCHASE', title: 'Purchases' }, { type: 'TRANSFER', title: 'Kitchens Transfer' },
   { type: 'WH_TXN', title: 'Warehouse Transactions' }, { type: 'WASTE', title: 'Waste' }, { type: 'CLOSING', title: 'Closing Stock Count' },
@@ -41,7 +46,7 @@ async function fetchReport(sb: SupabaseClient, kind: 'stock' | 'consumption', ki
 }
 
 export async function buildArchive(sb: SupabaseClient, o: {
-  kitchens: Kitchen[]; from: string; to: string; reports?: boolean; onProgress?: (msg: string) => void;
+  kitchens: Kitchen[]; from: string; to: string; reports?: boolean; skipTransfers?: boolean; onProgress?: (msg: string) => void;
 }): Promise<{ blob: Blob; name: string; summary: string[]; totalDocs: number }> {
   const enc = new TextEncoder();
   const files: { name: string; data: Uint8Array }[] = [];
@@ -50,6 +55,7 @@ export async function buildArchive(sb: SupabaseClient, o: {
   let totalDocs = 0;
 
   for (const [i, pg] of ARCHIVE_PAGES.entries()) {
+    if (o.skipTransfers && pg.type === 'TRANSFER') continue;   // مسح مطبخ واحد مبيمسحش التحويلات
     o.onProgress?.(`${pg.title}…`);
     const docs = [];
     for (const k of o.kitchens) docs.push(...await fetchAllDocs(sb, { type: pg.type, kitchenId: k.id, from: o.from, to: o.to, mode: 'own', reversals: true }));

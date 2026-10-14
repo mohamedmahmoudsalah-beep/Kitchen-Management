@@ -86,8 +86,8 @@ export default function ProductsView({ canManage, isAdmin }: { canManage: boolea
 
   return (
     <>
-      {panel?.kind === 'add' && <ProductForm product={null} onClose={() => setPanel(null)} onSaved={() => { setNote('اتضاف المنتج'); done(); }} />}
-      {panel?.kind === 'edit' && <ProductForm product={panel.product} onClose={() => setPanel(null)} onSaved={() => { setNote('اتحفظ التعديل'); done(); }} />}
+      {panel?.kind === 'add' && <ProductForm key="add" product={null} onClose={() => setPanel(null)} onSaved={() => { setNote('اتضاف المنتج'); done(); }} />}
+      {panel?.kind === 'edit' && <ProductForm key={panel.product.id} product={panel.product} onClose={() => setPanel(null)} onSaved={() => { setNote('اتحفظ التعديل'); done(); }} />}
       {panel?.kind === 'import' && (
         <div className="panel" style={{ borderColor: 'var(--magenta)' }}>
           <div className="page-head" style={{ marginBottom: 8 }}>

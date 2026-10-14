@@ -67,6 +67,10 @@ export default function DocumentsView({ docType, importModule, canWrite, canReve
     }
   }
 
+  // تعديل سطر واحد في مستند Posted بدل Reverse للمستند كله (المشتريات للـ Admin بس زي الـ Reverse)
+  const lineEditable = (r: DocumentRow) => canReverse && (docType !== 'PURCHASE' || isAdmin) && r.status === 'POSTED' && !r.reverses_document_id
+    && !r.doc_no.startsWith('ARC-') && !(r.note ?? '').startsWith('Count variance of');
+
   async function reverse() {
     if (!rev) return;
     const { error } = await supabase.rpc('reverse_document', { p_doc: rev.id, p_reason: reason });
@@ -140,7 +144,7 @@ export default function DocumentsView({ docType, importModule, canWrite, canReve
                       )}
                     </td>
                   </tr>
-                  {open === r.id && <tr><td colSpan={7} style={{ background: '#fafbfd', padding: 8 }}><DocumentLines docId={r.id} /></td></tr>}
+                  {open === r.id && <tr><td colSpan={7} style={{ background: '#fafbfd', padding: 8 }}><DocumentLines docId={r.id} edit={lineEditable(r) ? { docType, onChanged: (text) => { setMsg({ kind: 'ok', text: `${r.doc_no}: ${text}` }); load(); } } : undefined} /></td></tr>}
                 </Fragment>
               ))}
               {!rows.length && <tr><td colSpan={7} className="empty">{loading ? 'Loading…' : q || status ? 'مفيش نتايج للبحث ده' : 'No documents in this period'}</td></tr>}
