@@ -6,6 +6,8 @@ import { useScope } from '@/components/ScopeProvider';
 import Qty from '@/components/Qty';
 import { downloadCsv, downloadXlsx, ymd } from '@/lib/export';
 import { fmt } from '@/lib/qty';
+import { groupByGeneric, type Grouped } from '@/lib/group-generic';
+import { lastPurchased } from '@/lib/import/ambiguous';
 
 type R = {
   product_id: string; syt_code: string; generic_code: string | null; product_name: string; category: string | null;
@@ -47,6 +49,8 @@ export default function StockReportView({ kind }: { kind: 'stock' | 'consumption
   const [err, setErr] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [pieces, setPieces] = useState(true);
+  const [byGeneric, setByGeneric] = useState(true);
+  const [lastSyt, setLastSyt] = useState<Record<string, string>>({});
   const cols = kind === 'stock' ? STOCK_COLS : CONS_COLS;
   const valueKey: keyof R = kind === 'stock' ? 'closing_book' : 'consumption';
 
@@ -68,14 +72,35 @@ export default function StockReportView({ kind }: { kind: 'stock' | 'consumption
     return () => { alive = false; };
   }, [supabase, kind, kitchenId, from, to]);
 
+  // آخر Syt اتشترى لكل Generic (بيحدد اسم الصف المجمّع)
+  useEffect(() => {
+    if (!byGeneric || !rows.length) return;
+    const gens = [...new Set(rows.map((r) => r.generic_code).filter((g): g is string => !!g))];
+    let alive = true;
+    (async () => {
+      const out: Record<string, string> = {};
+      for (let i = 0; i < gens.length; i += 300) {
+        const res = await lastPurchased(supabase, gens.slice(i, i + 300));
+        Object.entries(res).forEach(([code, v]) => { out[code] = v.syt; });
+      }
+      if (alive) setLastSyt(out);
+    })();
+    return () => { alive = false; };
+  }, [supabase, byGeneric, rows]);
+
+  const qtyKeys = useMemo(() => cols.map((c) => c.key as string), [cols]);
+  const display: Grouped<R>[] = useMemo(
+    () => groupByGeneric(rows, qtyKeys, valueKey as string, byGeneric ? lastSyt : {}, byGeneric),
+    [rows, qtyKeys, valueKey, lastSyt, byGeneric],
+  );
   const needle = q.trim().toLowerCase();
-  const shown = rows.filter((r) => !needle || `${r.syt_code} ${r.generic_code ?? ''} ${r.product_name}`.toLowerCase().includes(needle));
-  const value = (r: R) => Number(r[valueKey] ?? 0) * Number(r.cost_per_uom);
+  const shown = display.filter((r) => !needle || r.search.includes(needle));
+  const value = (r: Grouped<R>) => r.value;
   const total = shown.reduce((s, r) => s + value(r), 0);
 
-  const head = ['Syt Code', 'Generic Code', 'Product', 'Category', 'Base Qty per Syt', ...cols.map((c) => c.label), 'Cost Pr UOM (current)', 'Value @ current cost'];
-  const exportRows = () => shown.map((r) => [r.syt_code, r.generic_code, r.product_name, r.category, Number(r.uom_factor),
-    ...cols.map((c) => Number(r[c.key] ?? 0)), Number(r.cost_per_uom), Math.round(value(r) * 100) / 100]);
+  const head = ['Syt Code', 'Generic Code', 'Product', 'Category', 'Base Qty per Syt', 'Syt Codes', ...cols.map((c) => c.label), 'Cost Pr UOM (current)', 'Value @ current cost'];
+  const exportRows = () => shown.map((r) => [r.grouped ? '' : r.syt_code, r.generic_code, r.product_name, r.category, r.grouped ? '' : Number(r.uom_factor), r.members.join(' | '),
+    ...cols.map((c) => Number(r[c.key] ?? 0)), Math.round(Number(r.cost_per_uom) * 10000) / 10000, Math.round(value(r) * 100) / 100]);
   const fileBase = `${kind === 'stock' ? 'warehouse-stock' : 'consumption'}-${kitchen?.code ?? ''}-${from}_${to}`;
 
   const first = rows[0];
@@ -89,6 +114,7 @@ export default function StockReportView({ kind }: { kind: 'stock' | 'consumption
           <Search size={14} style={{ position: 'absolute', left: 8, top: 9, color: 'var(--muted)' }} />
           <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search product" style={{ paddingLeft: 28, width: 220 }} />
         </div>
+        <label className="muted" title="يجمّع كل أكواد السيستم (الأحجام) اللي ليها نفس الـ Generic Code في صف واحد"><input type="checkbox" checked={byGeneric} onChange={(e) => setByGeneric(e.target.checked)} /> Group by Generic Code</label>
         <label className="muted"><input type="checkbox" checked={pieces} onChange={(e) => setPieces(e.target.checked)} /> Show Syt pcs</label>
         <span className="muted" dir="auto">{kitchen?.name} · {from} → {to} · {shown.length} منتج</span>
         <span className="spacer" />
@@ -117,7 +143,9 @@ export default function StockReportView({ kind }: { kind: 'stock' | 'consumption
           <tbody>
             {shown.map((r) => (
               <tr key={r.product_id}>
-                <td className="mono">{r.syt_code}{r.generic_code && <div className="muted">{r.generic_code}</div>}</td>
+                <td className="mono">
+                  {r.grouped ? <>{r.generic_code}<div className="muted" title={r.members.join(', ')}>{r.members.length} Syt codes</div></> : <>{r.syt_code}{r.generic_code && <div className="muted">{r.generic_code}</div>}</>}
+                </td>
                 <td dir="auto">{r.product_name}</td>
                 {cols.map((c) => (
                   <td key={c.key} className="num" style={c.bold ? { fontWeight: 700 } : undefined}>
