@@ -280,7 +280,7 @@ select testh.expect_err(format($$select public.close_period(%L, '2026-10-01', '2
 select testh.logout();
 select testh.login('mohamed.mahmoudsalah@breadfast.com');
 select public.close_period(:'k_plus'::uuid, '2026-10-01', '2026-10-31') as period_id \gset
-select testh.expect_err(format($$select public.close_period(%L, '2026-10-01', '2026-11-30')$$, :'k_plus'), '%conflicting key%');
+select testh.expect_err(format($$select public.close_period(%L, '2026-10-01', '2026-11-30')$$, :'k_plus'), '%بتتداخل مع فترة مقفولة%');
 select testh.logout();
 
 select testh.login('ali@breadfast.com');

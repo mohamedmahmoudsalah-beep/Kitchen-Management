@@ -5,8 +5,8 @@
 ## 1) Supabase
 1. اعمل Project جديد (Free).
 2. **SQL Editor**: شغّل الملفات بالترتيب من `supabase/migrations/`:
-   `001_foundation.sql` ← `002_stock_engine.sql` ← `003_import.sql` ← `004_grants.sql` ← `005_data_product_v2_reasons.sql` ← `006_batch2_entry_transfers_closing_reports.sql` ← `007_batch3_closing_opening_writeoff_transfers_import.sql` ← `008_open_signup_manager_approval.sql` ← `009_batch4_transfer_targets_purchase_lock_opening_zero_product_card.sql` ← `010_batch4_1_zero_everywhere_closing_carry_admin.sql` ← `011_batch5_documents_search.sql` ← `012_batch6_month_locks_archive_purge.sql` ← `013_batch7_import_code_priority_closing_validation.sql` ← `014_batch7_1_purge_without_lock_delete_closing.sql`
-   - لو كنت شغّلت لحد 013: شغّل `014` بس. لو لحد 012: `013` ثم `014`. لو لحد 011: `012` ثم `013`. لو لحد 010: `011` ثم `012`. لو لحد 009: `010` ثم `011`. ولو لحد 008: `009` ثم `010` ثم `011`.
+   `001_foundation.sql` ← `002_stock_engine.sql` ← `003_import.sql` ← `004_grants.sql` ← `005_data_product_v2_reasons.sql` ← `006_batch2_entry_transfers_closing_reports.sql` ← `007_batch3_closing_opening_writeoff_transfers_import.sql` ← `008_open_signup_manager_approval.sql` ← `009_batch4_transfer_targets_purchase_lock_opening_zero_product_card.sql` ← `010_batch4_1_zero_everywhere_closing_carry_admin.sql` ← `011_batch5_documents_search.sql` ← `012_batch6_month_locks_archive_purge.sql` ← `013_batch7_import_code_priority_closing_validation.sql` ← `014_batch7_1_purge_without_lock_delete_closing.sql` ← `015_batch7_4_reclose_reopened_period.sql` ← `016_batch8_reset_all_data.sql`
+   - لو كنت شغّلت لحد 015: شغّل `016` بس. لو لحد 014: `015` ثم `016`. لو لحد 013: `014` ثم `015`. لو لحد 012: `013` ثم `014`. لو لحد 011: `012` ثم `013`. لو لحد 010: `011` ثم `012`. لو لحد 009: `010` ثم `011`. ولو لحد 008: `009` ثم `010` ثم `011`.
    - لو كنت شغّلت لحد 007 قبل كده: شغّل `008` بس (بيحدّث الموجود ومش بيمسح داتا).
    - `005` لحد `008` بيعيدوا تطبيق الـ grants في آخرهم، فمفيش داعي تشغّل 004 تاني.
 3. **Authentication → Providers**: فعّل **Google** (محتاج OAuth Client من Google Cloud Console).
@@ -40,6 +40,13 @@ Import الـ repo، وضيف المتغيرين `NEXT_PUBLIC_SUPABASE_URL` و `
 - **Stock Ledger append-only**، والأرصدة في `stock_balances` عليها `CHECK (qty_base >= 0)`.
 - **كل مطبخ = Location مخزون واحد** (WAREHOUSE). `IN_TRANSIT` و`RETURN_PENDING` محجوزين للتحويلات (الدفعة 2).
 - Schema جاهز لـ V2: `odoo_po_id`, `odoo_ref`, `odoo_po_line_id`, `qty_ordered_base`.
+
+## الدفعة 8 (016) — مسح كل البيانات
+- **Import/Export ← منطقة الخطر (Admin بس)**: زرار Delete all data بكلمة سر وتأكيد. بيمسح المستندات والحركات والأرصدة والفترات والمنتجات وسجل الـ Import والـ Audit ويرجّع الترقيم من 1. بيفضل المستخدمين والمطابخ وأسباب Waste/Adjustments. بيسيب أثر واحد في الـ Audit (ADMIN_RESET_ALL).
+- **قبل ما الناس تشتغل بجد** شغّل في SQL Editor: `drop function public.reset_all_data(text);` عشان الزرار مايبقاش موجود في الإنتاج.
+
+## تصليح 7.4 (015)
+- **إعادة قفل فترة اتفتحت (Reopen)**: كان بيفشل برسالة "الفترة دي بتتداخل مع فترة مقفولة" لأن صف الفترة بيفضل OPEN. دلوقتي القفل بيقفل الصف المفتوح نفسه (ويضيف صفوف للأيام اللي ملهاش فترة). رسايل الأخطاء بقت بتذكر حدود الفترة المتداخلة.
 
 ## تصليح 7.3 (واجهة فقط)
 - **الأحجام المتطابقة**: لو الأكواد المتكررة (نفس الـ Generic) أحجامها نفس الـ UOM ونفس الـ base، بيتختار واحد منهم تلقائيًا (آخر حجم اتشترى لو موجود، وإلا أول Syt Code) ومبتظهرش في القايمة. القايمة بتظهر بس لو الـ UOM أو الـ base مختلف.

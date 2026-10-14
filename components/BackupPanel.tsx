@@ -6,6 +6,7 @@ import { BACKUP_TABLES, runBackup } from '@/lib/backup';
 import { useScope } from '@/components/ScopeProvider';
 import { buildArchive } from '@/lib/archive';
 import ArchivePurgePanel from '@/components/ArchivePurgePanel';
+import ResetPanel from '@/components/ResetPanel';
 import { saveBlob, ymd } from '@/lib/export';
 
 function PagesBackup() {
@@ -88,5 +89,5 @@ function RawBackup() {
 }
 
 export default function BackupPanel() {
-  return <><PagesBackup /><ArchivePurgePanel /><RawBackup /></>;
+  return <><PagesBackup /><ArchivePurgePanel /><RawBackup /><ResetPanel /></>;
 }
