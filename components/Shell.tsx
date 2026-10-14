@@ -5,10 +5,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   LayoutDashboard, PackageOpen, ShoppingCart, ArrowLeftRight, Warehouse, Trash2, ClipboardCheck,
   Flame, Boxes, SlidersHorizontal, Database, FileUp, FileWarning, ShieldCheck, ScrollText,
-  Search, PanelLeftClose, PanelLeftOpen, LogOut,
+  Search, PanelLeftClose, PanelLeftOpen, LogOut, TrendingDown,
 } from 'lucide-react';
 import type { Kitchen, PageDef } from '@/lib/types';
-import { GLOBAL_PAGES, NAV_GROUPS, PAGE_HREF } from '@/lib/nav';
+import { GLOBAL_PAGES, NAV_GROUPS, NO_DATE_PAGES, PAGE_HREF } from '@/lib/nav';
 import { ScopeProvider, useScope } from '@/components/ScopeProvider';
 import { createClient } from '@/lib/supabase/client';
 import Logo from '@/components/Logo';
@@ -16,7 +16,7 @@ import Logo from '@/components/Logo';
 const ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
   dashboard: LayoutDashboard, opening_balance: PackageOpen, purchases: ShoppingCart, kitchens_transfer: ArrowLeftRight,
   warehouse_transactions: Warehouse, waste: Trash2, closing_stock_count: ClipboardCheck, consumption: Flame,
-  warehouse_stock: Boxes, stock_adjustments: SlidersHorizontal, data_product: Database, import_export: FileUp,
+  warehouse_stock: Boxes, low_stock: TrendingDown, stock_adjustments: SlidersHorizontal, data_product: Database, import_export: FileUp,
   import_errors: FileWarning, access_control: ShieldCheck, audit_log: ScrollText,
 };
 
@@ -107,19 +107,23 @@ function Topbar({ pages }: { pages: PageDef[] }) {
   const path = usePathname();
   const key = keyOfPath(path);
   const title = pages.find((p) => p.key === key)?.title ?? '';
-  const { kitchens, kitchenId, setKitchenId, from, to, setFrom, setTo } = useScope();
+  const { kitchens, kitchenId, setKitchenId, from, to, setFrom, setTo, dashAll, setDashAll } = useScope();
   const off = key ? GLOBAL_PAGES.has(key) : false;
+  const noDates = key ? NO_DATE_PAGES.has(key) : false;
+  const allOption = key === 'dashboard' && kitchens.length > 1;
   return (
     <header className="topbar">
       <h1>{title}</h1>
       <div className={`scope ${off ? 'off' : ''}`} title={off ? 'الصفحة دي مش مرتبطة بمطبخ أو فترة' : undefined}>
         <label>Branch
-          <select value={kitchenId} onChange={(e) => setKitchenId(e.target.value)}>
+          <select value={allOption && dashAll ? 'ALL' : kitchenId}
+            onChange={(e) => { if (e.target.value === 'ALL') setDashAll(true); else { setDashAll(false); setKitchenId(e.target.value); } }}>
+            {allOption && <option value="ALL">All Kitchens</option>}
             {kitchens.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
           </select>
         </label>
-        <label>From <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label>
-        <label>To <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} /></label>
+        {!noDates && <label>From <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label>}
+        {!noDates && <label>To <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} /></label>}
       </div>
     </header>
   );

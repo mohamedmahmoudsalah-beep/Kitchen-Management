@@ -9,6 +9,7 @@ export const PAGE_HREF: Record<string, string> = {
   closing_stock_count: '/closing-stock-count',
   consumption: '/consumption',
   warehouse_stock: '/warehouse-stock',
+  low_stock: '/low-stock',
   stock_adjustments: '/stock-adjustments',
   data_product: '/data-product',
   import_export: '/import-export',
@@ -20,13 +21,16 @@ export const PAGE_HREF: Record<string, string> = {
 export const NAV_GROUPS: { title: string; keys: string[] }[] = [
   { title: 'Overview', keys: ['dashboard'] },
   { title: 'Operations', keys: ['opening_balance', 'purchases', 'kitchens_transfer', 'warehouse_transactions', 'waste', 'closing_stock_count', 'stock_adjustments'] },
-  { title: 'Reports', keys: ['consumption', 'warehouse_stock'] },
+  { title: 'Reports', keys: ['consumption', 'warehouse_stock', 'low_stock'] },
   { title: 'Data', keys: ['data_product', 'import_export', 'import_errors'] },
   { title: 'Admin', keys: ['access_control', 'audit_log'] },
 ];
 
 // صفحات مش مرتبطة بمطبخ/فترة
 export const GLOBAL_PAGES = new Set(['data_product', 'access_control']);
+
+// صفحات لايف (الرصيد الحالي) من غير فلتر تواريخ
+export const NO_DATE_PAGES = new Set(['low_stock']);
 
 // الصفحات اللي ليها Import من الملف + نوع المستند
 export const IMPORT_MODULE_OF_PAGE: Record<string, string> = {

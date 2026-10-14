@@ -12,6 +12,9 @@ type Scope = {
   setFrom: (v: string) => void;
   setTo: (v: string) => void;
   kitchen: Kitchen | undefined;
+  // اختيار "All Kitchens" موجود في الـ Dashboard بس، وباقي الصفحات بتفضل على مطبخ واحد
+  dashAll: boolean;
+  setDashAll: (v: boolean) => void;
 };
 
 const Ctx = createContext<Scope | null>(null);
@@ -22,6 +25,7 @@ export function ScopeProvider({ kitchens, children }: { kitchens: Kitchen[]; chi
   const [kitchenId, setKitchenId] = useState(kitchens[0]?.id ?? '');
   const [from, setFrom] = useState(ymd(new Date(now.getFullYear(), now.getMonth(), 1)));
   const [to, setTo] = useState(ymd(now));
+  const [dashAll, setDashAll] = useState(false);
 
   // استرجاع آخر اختيار
   useEffect(() => {
@@ -30,17 +34,18 @@ export function ScopeProvider({ kitchens, children }: { kitchens: Kitchen[]; chi
       if (s?.kitchenId && kitchens.some((k) => k.id === s.kitchenId)) setKitchenId(s.kitchenId);
       if (s?.from) setFrom(s.from);
       if (s?.to) setTo(s.to);
+      if (s?.dashAll && kitchens.length > 1) setDashAll(true);
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    try { localStorage.setItem(KEY, JSON.stringify({ kitchenId, from, to })); } catch { /* ignore */ }
-  }, [kitchenId, from, to]);
+    try { localStorage.setItem(KEY, JSON.stringify({ kitchenId, from, to, dashAll })); } catch { /* ignore */ }
+  }, [kitchenId, from, to, dashAll]);
 
   const value = useMemo<Scope>(() => ({
     kitchens, kitchenId, from, to, setKitchenId, setFrom, setTo,
-    kitchen: kitchens.find((k) => k.id === kitchenId),
-  }), [kitchens, kitchenId, from, to]);
+    kitchen: kitchens.find((k) => k.id === kitchenId), dashAll, setDashAll,
+  }), [kitchens, kitchenId, from, to, dashAll]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

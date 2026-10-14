@@ -2,13 +2,14 @@ import { notFound } from 'next/navigation';
 import DocumentsView from '@/components/DocumentsView';
 import PeriodsPanel from '@/components/PeriodsPanel';
 import ReasonsPanel from '@/components/ReasonsPanel';
+import LowStockView from '@/components/LowStockView';
 import StockReportView from '@/components/StockReportView';
 import TransfersView from '@/components/TransfersView';
 import { requirePage } from '@/lib/auth';
 import { DOC_TYPE_OF_PAGE, IMPORT_MODULE_OF_PAGE, PAGE_HREF } from '@/lib/nav';
 
 const SLUG_KEYS = ['opening_balance', 'purchases', 'kitchens_transfer', 'warehouse_transactions', 'waste',
-  'closing_stock_count', 'consumption', 'warehouse_stock', 'stock_adjustments'];
+  'closing_stock_count', 'consumption', 'warehouse_stock', 'low_stock', 'stock_adjustments'];
 const SLUG_TO_KEY: Record<string, string> = Object.fromEntries(SLUG_KEYS.map((key) => [PAGE_HREF[key].slice(1), key]));
 
 export function generateStaticParams() {
@@ -27,6 +28,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
 
   if (key === 'warehouse_stock') return <StockReportView kind="stock" />;
   if (key === 'consumption') return <StockReportView kind="consumption" />;
+  if (key === 'low_stock') return <LowStockView canUpload={canWrite} />;
   const canImport = canWrite && s.pages.some((p) => p.key === 'import_export');
   if (key === 'kitchens_transfer') {
     return <TransfersView canWrite={canWrite} canReverse={canReverse} isAdmin={isAdmin} canImport={canImport}

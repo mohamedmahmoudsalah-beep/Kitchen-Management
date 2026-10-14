@@ -1,8 +1,8 @@
-# ملخص مشروع Kitchen Management System (KMS) — آخر تحديث: الدفعة 9
+# ملخص مشروع Kitchen Management System (KMS) — آخر تحديث: الدفعة 10
 
 **الهدف:** ERP صغير لمطابخ Breadfast (Plus Mall, Rehab, Maadi, NC7). بديل لمحاولة Apps Script القديمة اللي كانت بطيئة.
 **التقنيات (قرار نهائي، كله مجاني):** Supabase (Postgres + Auth + RLS) + Next.js 15 / TypeScript على Vercel + تسجيل دخول Google. Excel وSheets للتصدير فقط.
-**آخر تسليم:** `kms-batch9.zip` (المشروع الكامل). الـ migrations بالترتيب في `supabase/migrations`: `001` لحد `017`. الأوامر: `supabase/tests/run_tests.sh` (SQL على Postgres محلي)، `npx vitest run` (50 اختبار)، `npm run build` لازم ينجح قبل أي تسليم.
+**آخر تسليم:** `kms-batch10.zip` (المشروع الكامل). الـ migrations بالترتيب في `supabase/migrations`: `001` لحد `018`. الأوامر: `supabase/tests/run_tests.sh` (SQL على Postgres محلي)، `npx vitest run` (58 اختبار) + `node supabase/tests/110_tests_batch9.mjs` (SQL على PGlite)، `npm run build` لازم ينجح قبل أي تسليم.
 
 ## الأدوار
 - **Admin:** كل حاجة. الـ Root `mohamed.mahmoudsalah@breadfast.com` مينفعش يتعطل أو يتحذف.
@@ -33,6 +33,8 @@
 
 ## التقارير والشاشات
 - **Group by Generic Code (Warehouse Stock + Consumption):** زرار مفعّل افتراضيًا بيجمّع كل Syt Codes اللي ليها نفس الـ Generic في صف واحد (الكميات بالكيلو بتتجمّع، والقيمة = مجموع كل حجم بتكلفته). الصف المجمّع بيعرض الكيلو بس (من غير pcs)، واسمه من آخر حجم اتشترى (`last_purchased_syt`) وإلا أول Syt بالترتيب. الـ Generic اللي ليه حجم واحد أو من غير Generic بيفضل صف عادي. لو الزرار اتطفى بيرجع التفصيل لكل Syt. الـ Export بيطلّع عمود `Syt Codes` بالأحجام المجمّعة. التجميع في الواجهة (`lib/group-generic.ts`) من غير تغيير في الـ RPCs.
+- **Dashboard (الدفعة 10):** اختيار **All Kitchens** في الـ Dashboard بس (باقي الصفحات مطبخ واحد). كروت (Stock value, Purchases, Usage, Waste, In transit, Return pending, Last count) + كروت Low/Avg/High/Not set + رسومات بالأيام (Stock value, Usage & Waste, Purchases) على فترة From/To (حد أقصى 180 يوم) + Stock value بالفئة/بالمطبخ + Needs attention + Top 8. كل القيم @ current cost. **Usage اليومي = صرف المخزن (WH_TXN)** لأن الاستهلاك الحقيقي محتاج جرد (بيفضل في صفحة Consumption). RPCs: `dashboard_summary(null)` = كل المطابخ المتاحة، `dashboard_trend`.
+- **Low Stock (صفحة جديدة `low_stock` في Reports):** رصيد لايف لكل مطبخ من غير فلتر تواريخ. لكل مطبخ شيت لوحده: `Code | Low Stock | High Stock` (بالكيلو). الحالة: الرصيد <= Low = Low، >= High = High، وبينهم Avg، ومن غير حدود Not set. الحدود على مستوى الـ Generic (أو Syt لو مفيش Generic) فكل الأحجام بتتجمّع. الرفع: Validate ثم Save (غلطة واحدة = ولا صف، الأخطاء برقم الصف)، وضعين: Add & update أو Replace all. Excel template بالأصناف الحالية. الجدول `stock_levels` (Audit + Backup + بيتمسح في reset). **الصفحة لازم تتدّي للمستخدمين من Access Control** (الـ Admin بيشوفها تلقائي).
 - Consumption = Opening + Purchases + Transfer In − Transfer Out − Closing − Waste. Warehouse Stock = Opening + Purchases + Confirmed Transfer In − Transfer Out − Warehouse Txn − Waste + Adjustments. Dashboard: قيمة المخزون وقايمة Needs attention.
 - **Export (Excel + CSV) على كل صفحات المستندات:** صف لكل صنف (Doc No, Date, Status, Lines, Note + المنتجات) ويطلّع كل المستندات المطابقة مش بس اللي على الشاشة.
 - قوايم المستندات: 100 في المرة + Load more + بحث (Doc No / ملاحظة / كود أو اسم منتج) + فلتر الحالة.
