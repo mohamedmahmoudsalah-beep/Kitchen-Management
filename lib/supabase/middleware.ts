@@ -20,7 +20,9 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  const { data: { user } } = await supabase.auth.getUser();
+  // getClaims بيتحقق من التوكن محليًا (ومبيعملش طلب شبكة مع مفاتيح التوقيع الجديدة) وبيجدد الجلسة لو خلصت
+  const { data: auth } = await supabase.auth.getClaims();
+  const user = auth?.claims?.sub ? auth.claims : null;
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + '/'));
 

@@ -24,7 +24,9 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
   const role = s.profile.role;
   const isAdmin = role === 'admin';
   const canWrite = role !== 'viewer';
-  const canReverse = isAdmin || role === 'manager';
+  // الـ Reverse وتعديل السطر للـ Admin بس. الـ Manager لسه بيقفل الفترات.
+  const canReverse = isAdmin;
+  const canManagePeriods = isAdmin || role === 'manager';
 
   if (key === 'warehouse_stock') return <StockReportView kind="stock" />;
   if (key === 'consumption') return <StockReportView kind="consumption" />;
@@ -38,7 +40,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
   return (
     <>
       {(key === 'waste' || key === 'stock_adjustments') && <ReasonsPanel canAdd={canWrite} isAdmin={isAdmin} />}
-      {key === 'closing_stock_count' && <PeriodsPanel canManage={canReverse} isAdmin={isAdmin} />}
+      {key === 'closing_stock_count' && <PeriodsPanel canManage={canManagePeriods} isAdmin={isAdmin} />}
       <DocumentsView docType={DOC_TYPE_OF_PAGE[key]} importModule={IMPORT_MODULE_OF_PAGE[key]}
         canWrite={canWrite} canReverse={canReverse} canImport={canImport} isAdmin={isAdmin} manual={key !== 'opening_balance'} />
     </>

@@ -1,10 +1,11 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useScope } from '@/components/ScopeProvider';
 import { BarList, LineChart } from '@/components/Charts';
+import { invalidateAll, loadCached } from '@/lib/cache';
 import { fmt, toPieces } from '@/lib/qty';
 
 type Summary = {
@@ -32,6 +33,7 @@ export default function DashboardView({ pages }: { pages: string[] }) {
   const [days, setDays] = useState<Day[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [trendErr, setTrendErr] = useState<string | null>(null);
+  const [nonce, setNonce] = useState(0);   // زرار Refresh
   const has = (k: string) => pages.includes(k);
 
   // الرسم بيغطي آخر 180 يوم كحد أقصى من تاريخ "To"
@@ -41,23 +43,24 @@ export default function DashboardView({ pages }: { pages: string[] }) {
   useEffect(() => {
     let alive = true;
     setS(null); setErr(null);
-    supabase.rpc('dashboard_summary', { p_kitchen: kid }).then(({ data, error }) => {
-      if (!alive) return;
-      if (error) setErr(error.message); else setS(data as Summary);
-    });
+    loadCached<Summary>(`dash:${kid ?? 'ALL'}`, async () => {
+      const { data, error } = await supabase.rpc('dashboard_summary', { p_kitchen: kid });
+      if (error) throw new Error(error.message);
+      return data as Summary;
+    }, (d) => { if (alive) setS(d); }).catch((e: Error) => { if (alive) setErr(e.message); });
     return () => { alive = false; };
-  }, [supabase, kid]);
+  }, [supabase, kid, nonce]);
 
   useEffect(() => {
     let alive = true;
     setDays(null); setTrendErr(null);
-    supabase.rpc('dashboard_trend', { p_kitchen: kid, p_from: trendFrom, p_to: to }).then(({ data, error }) => {
-      if (!alive) return;
-      if (error) setTrendErr(error.message);
-      else setDays(((data ?? []) as Day[]).map((d) => ({ ...d, stock_value: Number(d.stock_value), usage_value: Number(d.usage_value), waste_value: Number(d.waste_value), purchases_value: Number(d.purchases_value) })));
-    });
+    loadCached<Day[]>(`trend:${kid ?? 'ALL'}:${trendFrom}:${to}`, async () => {
+      const { data, error } = await supabase.rpc('dashboard_trend', { p_kitchen: kid, p_from: trendFrom, p_to: to });
+      if (error) throw new Error(error.message);
+      return ((data ?? []) as Day[]).map((d) => ({ ...d, stock_value: Number(d.stock_value), usage_value: Number(d.usage_value), waste_value: Number(d.waste_value), purchases_value: Number(d.purchases_value) }));
+    }, (d) => { if (alive) setDays(d); }).catch((e: Error) => { if (alive) setTrendErr(e.message); });
     return () => { alive = false; };
-  }, [supabase, kid, trendFrom, to]);
+  }, [supabase, kid, trendFrom, to, nonce]);
 
   const totals = useMemo(() => {
     const d = days ?? [];
@@ -87,6 +90,9 @@ export default function DashboardView({ pages }: { pages: string[] }) {
 
   return (
     <>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button className="btn secondary small" title="تحديث البيانات (بيتخزّن لمدة قصيرة عشان الصفحة تفتح أسرع)" onClick={() => { invalidateAll(); setNonce((n) => n + 1); }}><RefreshCw size={13} /> Refresh</button>
+      </div>
       <div className="cards">
         <div className="card"><div className="k">Stock value · {scopeName}</div><div className="v">{money(s.stock_value)}</div>
           <div className="muted">{s.products_in_stock.toLocaleString()} products in stock · @ current cost</div></div>

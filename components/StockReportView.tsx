@@ -1,12 +1,13 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { Download, Search } from 'lucide-react';
+import { RefreshCw, Download, Search } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useScope } from '@/components/ScopeProvider';
 import Qty from '@/components/Qty';
 import { downloadCsv, downloadXlsx, ymd } from '@/lib/export';
 import { fmt } from '@/lib/qty';
 import { groupByGeneric, type Grouped } from '@/lib/group-generic';
+import { invalidateAll, loadCached } from '@/lib/cache';
 import { lastPurchased } from '@/lib/import/ambiguous';
 
 type R = {
@@ -54,39 +55,41 @@ export default function StockReportView({ kind }: { kind: 'stock' | 'consumption
   const cols = kind === 'stock' ? STOCK_COLS : CONS_COLS;
   const valueKey: keyof R = kind === 'stock' ? 'closing_book' : 'consumption';
 
+  const [nonce, setNonce] = useState(0);   // زرار Refresh
   useEffect(() => {
     let alive = true;
     setLoading(true); setErr(null);
-    (async () => {
+    loadCached<R[]>(`rep:${kind}:${kitchenId}:${from}:${to}`, async () => {
       const all: R[] = [];
       for (let f = 0; ; f += 1000) {
         const { data, error } = await supabase
           .rpc(kind === 'stock' ? 'report_warehouse_stock' : 'report_consumption', { p_kitchen: kitchenId, p_from: from, p_to: to })
           .range(f, f + 999);
-        if (error) { if (alive) { setErr(error.message); setRows([]); setLoading(false); } return; }
+        if (error) throw new Error(error.message);
         all.push(...((data ?? []) as R[]));
         if (!data || data.length < 1000) break;
       }
-      if (alive) { setRows(all); setLoading(false); }
-    })();
+      return all;
+    }, (d) => { if (alive) { setRows(d); setLoading(false); } })
+      .catch((e: Error) => { if (alive) { setErr(e.message); setRows([]); setLoading(false); } });
     return () => { alive = false; };
-  }, [supabase, kind, kitchenId, from, to]);
+  }, [supabase, kind, kitchenId, from, to, nonce]);
 
   // آخر Syt اتشترى لكل Generic (بيحدد اسم الصف المجمّع)
   useEffect(() => {
     if (!byGeneric || !rows.length) return;
     const gens = [...new Set(rows.map((r) => r.generic_code).filter((g): g is string => !!g))];
     let alive = true;
-    (async () => {
+    loadCached<Record<string, string>>(`lastsyt:${kind}:${kitchenId}:${from}:${to}`, async () => {
       const out: Record<string, string> = {};
       for (let i = 0; i < gens.length; i += 300) {
         const res = await lastPurchased(supabase, gens.slice(i, i + 300));
         Object.entries(res).forEach(([code, v]) => { out[code] = v.syt; });
       }
-      if (alive) setLastSyt(out);
-    })();
+      return out;
+    }, (d) => { if (alive) setLastSyt(d); }).catch(() => undefined);
     return () => { alive = false; };
-  }, [supabase, byGeneric, rows]);
+  }, [supabase, byGeneric, rows, kind, kitchenId, from, to]);
 
   const qtyKeys = useMemo(() => cols.map((c) => c.key as string), [cols]);
   const display: Grouped<R>[] = useMemo(
@@ -118,6 +121,7 @@ export default function StockReportView({ kind }: { kind: 'stock' | 'consumption
         <label className="muted"><input type="checkbox" checked={pieces} onChange={(e) => setPieces(e.target.checked)} /> Show Syt pcs</label>
         <span className="muted" dir="auto">{kitchen?.name} · {from} → {to} · {shown.length} منتج</span>
         <span className="spacer" />
+        <button className="btn secondary" title="تحديث البيانات" onClick={() => { invalidateAll(); setNonce((n) => n + 1); }}><RefreshCw size={14} /> Refresh</button>
         <button className="btn secondary" disabled={!shown.length} onClick={() => downloadCsv(`${fileBase}.csv`, head, exportRows())}><Download size={14} /> CSV</button>
         <button className="btn secondary" disabled={!shown.length} onClick={() => downloadXlsx(`${fileBase}.xlsx`, head, exportRows())}><Download size={14} /> XLSX</button>
       </div>

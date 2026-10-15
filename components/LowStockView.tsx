@@ -1,12 +1,13 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Download, FileSpreadsheet, Search, Upload } from 'lucide-react';
+import { Download, FileSpreadsheet, RefreshCw, Search, Upload } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useScope } from '@/components/ScopeProvider';
 import { downloadCsv, downloadXlsx } from '@/lib/export';
 import { readTable } from '@/lib/import/parse-file';
 import { levelsFromTable, MISSING_LABEL, STATUS_BADGE, STATUS_LABEL, type LevelRow, type StockStatus } from '@/lib/low-stock';
 import { fmt } from '@/lib/qty';
+import { invalidateAll, loadCached } from '@/lib/cache';
 
 type Row = { item_key: string; product_name: string; category: string | null; sizes: number; qty: number; value: number; low_qty: number | null; high_qty: number | null; status: StockStatus };
 type Result = { ok: boolean; errors?: { row: number; column: string; reason: string }[]; error_count?: number; count?: number; created?: number; updated?: number; unchanged?: number; removed?: number; committed?: boolean };
@@ -30,9 +31,13 @@ export default function LowStockView({ canUpload }: { canUpload: boolean }) {
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
-    const { data, error } = await supabase.rpc('report_low_stock', { p_kitchen: kitchenId });
-    if (error) setErr(error.message);
-    else setRows((data as Row[]).map((r) => ({ ...r, qty: Number(r.qty), value: Number(r.value), low_qty: r.low_qty === null ? null : Number(r.low_qty), high_qty: r.high_qty === null ? null : Number(r.high_qty) })));
+    try {
+      await loadCached<Row[]>(`low:${kitchenId}`, async () => {
+        const { data, error } = await supabase.rpc('report_low_stock', { p_kitchen: kitchenId });
+        if (error) throw new Error(error.message);
+        return (data as Row[]).map((r) => ({ ...r, qty: Number(r.qty), value: Number(r.value), low_qty: r.low_qty === null ? null : Number(r.low_qty), high_qty: r.high_qty === null ? null : Number(r.high_qty) }));
+      }, (d) => setRows(d));
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     setLoading(false);
   }, [supabase, kitchenId]);
   useEffect(() => { load(); }, [load]);
@@ -152,6 +157,7 @@ export default function LowStockView({ canUpload }: { canUpload: boolean }) {
           </div>
           <span className="muted" dir="auto">{kitchen?.name} · الرصيد الحالي (لايف) · {shown.length} صنف</span>
           <span className="spacer" />
+          <button className="btn secondary" title="تحديث البيانات" onClick={() => { invalidateAll(); load(); }}><RefreshCw size={14} /> Refresh</button>
           <button className="btn secondary" disabled={!shown.length} onClick={() => downloadCsv(`${fileBase}.csv`, head, exportRows())}><Download size={14} /> CSV</button>
           <button className="btn secondary" disabled={!shown.length} onClick={() => downloadXlsx(`${fileBase}.xlsx`, head, exportRows())}><Download size={14} /> XLSX</button>
         </div>

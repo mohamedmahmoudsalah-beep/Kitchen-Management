@@ -10,31 +10,32 @@ export type Session = {
   pages: PageDef[]; // الصفحات المسموحة للمستخدم
 };
 
-// بيجيب جلسة المستخدم الفعّال (أو بيحوّله لـ login / pending)
+type RawSession = { profile: Profile | null; kitchens?: Kitchen[]; pages?: PageDef[]; allowed?: string[] };
+
+// الصفحات المسموحة: Access Control: للـ Admin كامل وللـ Manager (موافقة المستخدمين بحدود)
+export function allowedPages(profile: Profile, pages: PageDef[], allowed: string[]): PageDef[] {
+  const set = new Set(allowed);
+  const isAdmin = profile.role === 'admin';
+  return pages.filter((p) => (isAdmin ? true : p.key === 'access_control' ? profile.role === 'manager' : set.has(p.key)));
+}
+
+// بيجيب جلسة المستخدم الفعّال (أو بيحوّله لـ login / pending).
+// التوكن بيتفحص محليًا (getClaims) والباقي طلب واحد للداتا بيز (my_session) بدل 4 طلبات متتالية.
 export const getSession = cache(async (): Promise<Session> => {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  const { data: auth } = await supabase.auth.getClaims();
+  const claims = auth?.claims;
+  if (!claims?.sub) redirect('/login');
 
-  const { data: profile } = await supabase
-    .from('profiles').select('user_id,email,full_name,role,is_active,is_root')
-    .eq('user_id', user.id).maybeSingle();
-  if (!profile || !profile.is_active) redirect('/pending');
+  const { data, error } = await supabase.rpc('my_session');
+  const s = data as RawSession | null;
+  if (error || !s?.profile || !s.profile.is_active) redirect('/pending');
 
-  const [{ data: kitchens }, { data: pages }, { data: up }] = await Promise.all([
-    supabase.from('kitchens').select('id,code,name').order('name'),
-    supabase.from('pages').select('key,title,sort').order('sort'),
-    supabase.from('user_pages').select('page_key').eq('user_id', user.id),
-  ]);
-
-  const allowed = new Set((up ?? []).map((r) => r.page_key));
-  const isAdmin = profile.role === 'admin';
   return {
-    email: user.email ?? profile.email,
-    profile: profile as Profile,
-    kitchens: (kitchens ?? []) as Kitchen[],
-    // Access Control: للـ Admin كامل وللـ Manager (موافقة المستخدمين بحدود)
-    pages: ((pages ?? []) as PageDef[]).filter((p) => (isAdmin ? true : p.key === 'access_control' ? profile.role === 'manager' : allowed.has(p.key))),
+    email: (typeof claims.email === 'string' && claims.email) || s.profile.email,
+    profile: s.profile,
+    kitchens: s.kitchens ?? [],
+    pages: allowedPages(s.profile, s.pages ?? [], s.allowed ?? []),
   };
 });
 
