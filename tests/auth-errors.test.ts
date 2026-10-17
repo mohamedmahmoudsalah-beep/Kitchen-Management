@@ -8,7 +8,7 @@ describe('explainAuthError', () => {
   });
   it('explains a failed account creation (the usual cause of bouncing back to login)', () => {
     expect(explainAuthError('server_error', 'Database error saving new user')?.title).toContain('نسجّل');
-    expect(explainAuthError('server_error', 'Database error saving new user')?.hint).toContain('008');
+    expect(explainAuthError('server_error', 'Database error saving new user')?.hint).toContain('supabase/migrations');
   });
   it('explains PKCE / redirect / consent / key problems', () => {
     expect(explainAuthError('exchange_failed', 'both auth code and code verifier should be non-empty')?.title).toContain('الجلسة');

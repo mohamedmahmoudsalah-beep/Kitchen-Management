@@ -6,7 +6,7 @@ export function explainAuthError(error?: string | null, description?: string | n
   if (t.includes('database error saving new user')) {
     return {
       title: 'مقدرناش نسجّل الحساب',
-      hint: 'فشل إنشاء الـ Profile في الداتا بيز. غالبًا migrations ناقصة (لازم 001 لحد 008 بالترتيب) أو فيها خطأ — راجع Supabase ← Logs ← Postgres.',
+      hint: 'فشل إنشاء الـ Profile في الداتا بيز. غالبًا migrations ناقصة (لازم كل ملفات supabase/migrations بالترتيب من 001 لحد آخر واحدة) أو فيها خطأ — راجع Supabase ← Logs ← Postgres.',
     };
   }
   if (t.includes('code verifier') || t.includes('pkce') || t.includes('auth code')) {
