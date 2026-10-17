@@ -81,7 +81,7 @@ export default function AccessView({ isAdmin, managerPages }: { isAdmin: boolean
 
   const load = useCallback(async () => {
     const [p, a, b, i, k, g] = await Promise.all([
-      supabase.from('profiles').select('user_id,email,full_name,role,is_active,is_root').order('email'),
+      supabase.from('profiles').select('user_id,email,full_name,role,is_active,is_root,disabled_by_admin').order('email'),
       supabase.from('user_kitchens').select('user_id,kitchen_id'),
       supabase.from('user_pages').select('user_id,page_key'),
       supabase.from('access_invites').select('email,role,is_active,kitchen_ids,page_keys').order('email'),
@@ -147,14 +147,14 @@ export default function AccessView({ isAdmin, managerPages }: { isAdmin: boolean
                       <>
                         <td>{p.email} {p.is_root && <span className="badge magenta">Root</span>}{p.full_name && <div className="muted">{p.full_name}</div>}</td>
                         <td>{p.role}</td>
-                        <td>{p.is_active ? <span className="badge ok">Active</span> : <span className="badge warn">Pending activation</span>}</td>
+                        <td>{p.is_active ? <span className="badge ok">Active</span> : p.disabled_by_admin ? <span className="badge err">Disabled by Admin</span> : <span className="badge warn">Pending activation</span>}</td>
                         <td>{p.role === 'admin' ? 'All' : ks.map(kitchenName).join(', ') || <span className="muted">—</span>}</td>
                         <td>{p.role === 'admin' ? 'All' : ps.length}</td>
-                        <td><button className={`btn ${p.is_active ? 'secondary' : ''} small`} onClick={() => setOpen(isOpen ? null : p.user_id)}>{isOpen ? 'Close' : p.is_active ? 'Edit' : 'Approve'}</button></td>
+                        <td><button className={`btn ${p.is_active ? 'secondary' : ''} small`} onClick={() => setOpen(isOpen ? null : p.user_id)}>{isOpen ? 'Close' : p.is_active ? 'Edit' : p.disabled_by_admin ? 'Re-enable' : 'Approve'}</button></td>
                       </>
                     }
                     detail={isOpen ? (
-                      <Editor kitchens={kitchens} pages={scopedPages} locked={p.is_root} submitLabel={p.is_active ? 'Save access' : 'Approve and save'}
+                      <Editor kitchens={kitchens} pages={scopedPages} locked={p.is_root} submitLabel={p.is_active ? 'Save access' : p.disabled_by_admin ? 'Re-enable and save' : 'Approve and save'}
                         roles={isAdmin ? ROLES : ['viewer', 'kitchen_user']}
                         initial={{
                           role: p.is_active || isAdmin ? p.role : 'kitchen_user', active: true,

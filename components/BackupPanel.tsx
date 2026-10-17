@@ -90,5 +90,5 @@ function RawBackup() {
 }
 
 export default function BackupPanel() {
-  return <><PagesBackup /><ArchivePurgePanel /><PageDataPanel /><RawBackup /><ResetPanel /></>;
+  return <><PagesBackup /><ArchivePurgePanel /><PageDataPanel /><RawBackup />{process.env.NEXT_PUBLIC_ENABLE_RESET === '1' && <ResetPanel />}</>;
 }

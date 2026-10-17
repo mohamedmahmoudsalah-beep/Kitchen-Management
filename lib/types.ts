@@ -6,6 +6,7 @@ export type Profile = {
   full_name: string | null;
   role: Role;
   is_active: boolean;
+  disabled_by_admin?: boolean;
   is_root: boolean;
 };
 

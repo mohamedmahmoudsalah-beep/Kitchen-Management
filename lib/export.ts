@@ -1,8 +1,12 @@
 // تصدير CSV (UTF-8 + BOM عشان Excel يقرا العربي) و XLSX
 
+// CSV injection: نص بيبدأ بـ = + - @ (أو tab/CR) Excel بيعتبره معادلة. بنحط ' قبله (الأرقام الحقيقية زي -5 بتفضل زي ما هي)
+const NUMERIC = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+export const neutralizeFormula = (s: string) => (/^[=+\-@\t\r]/.test(s) && !NUMERIC.test(s) ? `'${s}` : s);
+
 export function toCsv(headers: string[], rows: (string | number | boolean | null | undefined)[][]): string {
   const esc = (v: unknown) => {
-    const s = v === null || v === undefined ? '' : String(v);
+    const s = v === null || v === undefined ? '' : typeof v === 'string' ? neutralizeFormula(v) : String(v);
     return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return '\uFEFF' + [headers, ...rows].map((r) => r.map(esc).join(',')).join('\r\n');

@@ -15,7 +15,7 @@ export default function LoginPage() {
     const error = p.get('error');
     const description = p.get('error_description');
     const info = explainAuthError(error, description);
-    if (info) setProblem({ ...info, raw: [error, description].filter(Boolean).join(' — ') });
+    if (info) setProblem({ ...info, raw: [error, description].filter(Boolean).join(' — ').slice(0, 300) });
   }, []);
 
   async function signIn() {
