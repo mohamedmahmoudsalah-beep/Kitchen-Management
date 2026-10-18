@@ -185,3 +185,25 @@ table.grid { width: 100%; border-collapse: collapse; }
 .skel-box { border-radius: 10px; background: linear-gradient(90deg, #eceef5 25%, #f6f7fb 37%, #eceef5 63%); background-size: 400% 100%; animation: skel 1.3s ease infinite; }
 @keyframes skel { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
 @media (prefers-reduced-motion: reduce) { .skel-box { animation: none; } }
+
+/* ---------- PDF button (batch 15) ---------- */
+.pdf-btn { color: var(--muted) !important; border: 1px solid var(--line); background: #fff; width: 30px; height: 28px; vertical-align: middle; display: inline-grid; }
+.pdf-btn:hover { color: var(--magenta) !important; border-color: var(--magenta); background: #fff; }
+.pdf-btn:disabled { opacity: .55; cursor: progress; }
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- Import dropzone (batch 15) ---------- */
+.dropzone { display: inline-flex; align-items: center; gap: 12px; min-width: 210px; padding: 8px 16px 8px 10px; border: 2px dashed #d58bc8; border-radius: 14px; background: linear-gradient(135deg, #fff, #fbeef9); cursor: pointer; transition: border-color .15s, background .15s, transform .15s, box-shadow .15s; user-select: none; }
+.dropzone:hover, .dropzone:focus-visible { border-color: var(--magenta); box-shadow: 0 6px 18px rgba(167, 38, 141, .18); transform: translateY(-1px); outline: none; }
+.dropzone.over { border-style: solid; border-color: var(--magenta); background: #f9dcf3; transform: scale(1.03); }
+.dz-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px; background: linear-gradient(135deg, #d4146f, #8f2bd6); color: #fff; flex: 0 0 40px; }
+.dz-text { display: grid; line-height: 1.25; text-align: left; }
+.dz-text b { font-size: .95rem; color: var(--text); }
+.dz-text small { color: var(--muted); font-size: .76rem; }
+
+/* ---------- Dashboard frames (batch 15) ---------- */
+.frame { border: 1px solid var(--line); border-radius: 14px; background: #fbfbfe; padding: 14px; display: grid; gap: 12px; }
+.frame > header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.frame > header h2 { margin: 0; font-size: 1.15rem; }
+.frame .cards { margin: 0; }

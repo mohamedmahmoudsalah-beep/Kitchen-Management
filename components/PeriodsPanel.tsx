@@ -12,7 +12,7 @@ type P = { id: string; from_date: string; to_date: string; status: 'OPEN' | 'CLO
 // قفل الفترات للمطبخ المختار: بعد القفل مفيش إدخال/تعديل بتاريخ رجعي إلا للـ Admin وبسبب مسجّل
 export default function PeriodsPanel({ canManage, isAdmin }: { canManage: boolean; isAdmin: boolean }) {
   const supabase = useMemo(() => createClient(), []);
-  const { kitchenId, kitchen } = useScope();
+  const { kitchenId, kitchen, from, to } = useScope();
   const [rows, setRows] = useState<P[]>([]);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [mFrom, setMFrom] = useState(prevMonth());
@@ -20,6 +20,9 @@ export default function PeriodsPanel({ canManage, isAdmin }: { canManage: boolea
   const [step, setStep] = useState<'idle' | 'downloading' | 'confirm'>('idle');
   const [progress, setProgress] = useState('');
   const range = monthRange(mFrom, mTo);
+  // بنعرض الفترات اللي بتتقاطع مع التاريخ المختار فوق بس: لما تعدّي لشهر جديد، الفترات المقفولة قبله بتختفي (وبتظهر لما تفلتر على شهرها)
+  const visible = useMemo(() => rows.filter((r) => r.from_date <= to && r.to_date >= from), [rows, from, to]);
+  const hidden = rows.length - visible.length;
   const [reopen, setReopen] = useState<P | null>(null);
   const [reason, setReason] = useState('');
 
@@ -59,7 +62,7 @@ export default function PeriodsPanel({ canManage, isAdmin }: { canManage: boolea
   return (
     <details className="panel" style={{ padding: '10px 14px' }}>
       <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Period lock · {kitchen?.name}
-        {rows.filter((r) => r.status === 'CLOSED').length > 0 && <span className="badge err" style={{ marginLeft: 8 }}>{rows.filter((r) => r.status === 'CLOSED').length} closed</span>}
+        {visible.filter((r) => r.status === 'CLOSED').length > 0 && <span className="badge err" style={{ marginLeft: 8 }}>{visible.filter((r) => r.status === 'CLOSED').length} closed</span>}
       </summary>
       <div style={{ marginTop: 10 }}>
         {msg && <div className={`alert ${msg.kind}`} style={{ marginBottom: 10 }} dir="auto">{msg.text}</div>}
@@ -94,7 +97,7 @@ export default function PeriodsPanel({ canManage, isAdmin }: { canManage: boolea
         <table className="grid">
           <thead><tr><th>From</th><th>To</th><th>Status</th><th>Closed at</th><th>Reopen reason</th><th /></tr></thead>
           <tbody>
-            {rows.map((r) => (
+            {visible.map((r) => (
               <tr key={r.id}>
                 <td>{r.from_date}</td><td>{r.to_date}</td>
                 <td><span className={`badge ${r.status === 'CLOSED' ? 'err' : 'ok'}`}>{r.status}</span></td>
@@ -103,9 +106,10 @@ export default function PeriodsPanel({ canManage, isAdmin }: { canManage: boolea
                 <td>{isAdmin && r.status === 'CLOSED' && <button className="btn secondary small" onClick={() => { setReopen(r); setMsg(null); }}><Unlock size={13} /> Reopen</button>}</td>
               </tr>
             ))}
-            {!rows.length && <tr><td colSpan={6} className="empty">No locked periods</td></tr>}
+            {!visible.length && <tr><td colSpan={6} className="empty">No locked periods in {from} → {to}</td></tr>}
           </tbody>
         </table>
+        {hidden > 0 && <div className="muted" style={{ marginTop: 6 }} dir="auto">فيه {hidden} فترة مقفولة تانية برا التاريخ المختار ({from} → {to}) — غيّر التاريخ من فوق عشان تشوفها.</div>}
       </div>
     </details>
   );

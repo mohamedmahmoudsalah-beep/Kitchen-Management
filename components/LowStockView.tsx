@@ -8,6 +8,8 @@ import { readTable } from '@/lib/import/parse-file';
 import { levelsFromTable, MISSING_LABEL, STATUS_BADGE, STATUS_LABEL, type LevelRow, type StockStatus } from '@/lib/low-stock';
 import { fmt } from '@/lib/qty';
 import { invalidateAll, loadCached } from '@/lib/cache';
+import PdfButton from '@/components/PdfButton';
+import { reportPdf } from '@/lib/pdf/documents';
 
 type Row = { item_key: string; product_name: string; category: string | null; sizes: number; qty: number; value: number; low_qty: number | null; high_qty: number | null; status: StockStatus };
 type Result = { ok: boolean; errors?: { row: number; column: string; reason: string }[]; error_count?: number; count?: number; created?: number; updated?: number; unchanged?: number; removed?: number; committed?: boolean };
@@ -56,6 +58,13 @@ export default function LowStockView({ canUpload }: { canUpload: boolean }) {
   const head = ['Code', 'Product', 'Category', 'Qty (base)', 'Low Stock', 'High Stock', 'Status', 'Value @ current cost'];
   const exportRows = () => shown.map((r) => [r.item_key, r.product_name, r.category, r.qty, r.low_qty, r.high_qty, STATUS_LABEL[r.status], Math.round(r.value * 100) / 100]);
   const fileBase = `low-stock-${kitchen?.code ?? ''}`;
+  const pdf = () => reportPdf({
+    title: 'Low Stock', subtitle: `${kitchen?.name ?? ''} · live stock · ${filter === 'ALL' ? 'all statuses' : STATUS_LABEL[filter]}`,
+    meta: [['Kitchen', kitchen?.name ?? ''], ['Items', String(shown.length)], ['Low', String(counts.LOW)], ['Avg', String(counts.AVG)], ['High', String(counts.HIGH)]],
+    cols: [{ head: 'Code', w: 11 }, { head: 'Product', w: 32 }, { head: 'Category', w: 15 }, { head: 'Qty (base)', w: 9, align: 'right' }, { head: 'Low ≤', w: 8, align: 'right' }, { head: 'High ≥', w: 8, align: 'right' }, { head: 'Status', w: 9 }, { head: 'Value', w: 10, align: 'right' }],
+    rows: shown.map((r) => [r.item_key, r.product_name, r.category ?? '', fmt(r.qty), r.low_qty === null ? '' : fmt(r.low_qty), r.high_qty === null ? '' : fmt(r.high_qty), STATUS_LABEL[r.status], fmt(r.value, 2)]),
+    fileBase,
+  });
   const template = () => downloadXlsx(`low-stock-template-${kitchen?.code ?? ''}.xlsx`, ['Code', 'Product', 'Low Stock', 'High Stock'],
     rows.length ? rows.map((r) => [r.item_key, r.product_name, r.low_qty, r.high_qty]) : [['RM0500', 'Example product', 10, 50]]);
 
@@ -158,6 +167,7 @@ export default function LowStockView({ canUpload }: { canUpload: boolean }) {
           <span className="muted" dir="auto">{kitchen?.name} · الرصيد الحالي (لايف) · {shown.length} صنف</span>
           <span className="spacer" />
           <button className="btn secondary" title="تحديث البيانات" onClick={() => { invalidateAll(); load(); }}><RefreshCw size={14} /> Refresh</button>
+          <PdfButton label="PDF" disabled={!shown.length} build={pdf} />
           <button className="btn secondary" disabled={!shown.length} onClick={() => downloadCsv(`${fileBase}.csv`, head, exportRows())}><Download size={14} /> CSV</button>
           <button className="btn secondary" disabled={!shown.length} onClick={() => downloadXlsx(`${fileBase}.xlsx`, head, exportRows())}><Download size={14} /> XLSX</button>
         </div>

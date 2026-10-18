@@ -17,6 +17,8 @@ type Summary = {
   by_category: { category: string; value: number }[];
   by_kitchen: { name: string; value: number }[];
 };
+type WasteData = { total_value: number; docs: number; by_reason: { reason: string; value: number; qty: number }[]; top_products: { syt_code: string; product_name: string; value: number; qty: number }[] };
+type MonthRow = { month: string; value: number | null; kitchens: number };
 type Day = { day: string; stock_value: number; usage_value: number; waste_value: number; purchases_value: number };
 
 const daysAgo = (d: string) => Math.floor((Date.now() - new Date(d + 'T00:00:00').getTime()) / 86400000);
@@ -34,6 +36,9 @@ export default function DashboardView({ pages }: { pages: string[] }) {
   const [err, setErr] = useState<string | null>(null);
   const [trendErr, setTrendErr] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);   // زرار Refresh
+  const [waste, setWaste] = useState<WasteData | null>(null);
+  const [months, setMonths] = useState<MonthRow[] | null>(null);
+  const [wasteErr, setWasteErr] = useState<string | null>(null);
   const has = (k: string) => pages.includes(k);
 
   // الرسم بيغطي آخر 180 يوم كحد أقصى من تاريخ "To"
@@ -61,6 +66,28 @@ export default function DashboardView({ pages }: { pages: string[] }) {
     }, (d) => { if (alive) setDays(d); }).catch((e: Error) => { if (alive) setTrendErr(e.message); });
     return () => { alive = false; };
   }, [supabase, kid, trendFrom, to, nonce]);
+
+  useEffect(() => {
+    let alive = true;
+    setWaste(null); setWasteErr(null);
+    loadCached<WasteData>(`waste:${kid ?? 'ALL'}:${trendFrom}:${to}`, async () => {
+      const { data, error } = await supabase.rpc('dashboard_waste', { p_kitchen: kid, p_from: trendFrom, p_to: to });
+      if (error) throw new Error(error.message);
+      return data as WasteData;
+    }, (d) => { if (alive) setWaste(d); }).catch((e: Error) => { if (alive) setWasteErr(e.message); });
+    return () => { alive = false; };
+  }, [supabase, kid, trendFrom, to, nonce]);
+
+  useEffect(() => {
+    let alive = true;
+    setMonths(null);
+    loadCached<MonthRow[]>(`months:${kid ?? 'ALL'}`, async () => {
+      const { data, error } = await supabase.rpc('dashboard_consumption_months', { p_kitchen: kid, p_months: 6 });
+      if (error) throw new Error(error.message);
+      return ((data ?? []) as MonthRow[]).map((m) => ({ ...m, value: m.value === null ? null : Number(m.value) }));
+    }, (d) => { if (alive) setMonths(d); }).catch(() => { if (alive) setMonths([]); });
+    return () => { alive = false; };
+  }, [supabase, kid, nonce]);
 
   const totals = useMemo(() => {
     const d = days ?? [];
@@ -119,36 +146,94 @@ export default function DashboardView({ pages }: { pages: string[] }) {
       {trendErr && <div className="alert err" dir="auto">{trendErr}</div>}
       {clamped && <div className="muted" dir="auto">الرسومات بتغطي آخر 180 يوم بس ({trendFrom} → {to}).</div>}
 
-      <div className="dash-grid">
-        <div className="panel">
-          <h2>Stock value by day</h2>
-          <div className="sub">قيمة المخزون آخر كل يوم · {scopeName} · @ current cost</div>
-          {!days ? <div className="muted">Loading…</div> : <LineChart area labels={labels} series={[{ name: 'Stock value', color: '#d4146f', values: days.map((d) => d.stock_value) }]} />}
-        </div>
-        <div className="panel">
-          <h2>Daily usage &amp; waste</h2>
-          <div className="sub" dir="auto">الاستهلاك اليومي = صرف المخزن (Warehouse Transactions). الاستهلاك الفعلي بعد الجرد بتلاقيه في صفحة Consumption.</div>
-          {!days ? <div className="muted">Loading…</div> : <LineChart labels={labels} series={[
-            { name: 'Usage', color: '#1f2858', values: days.map((d) => d.usage_value) },
-            { name: 'Waste', color: '#c62135', values: days.map((d) => d.waste_value) }]} />}
-        </div>
-        <div className="panel">
-          <h2>Purchases by day</h2>
-          <div className="sub">قيمة المشتريات اليومية · @ current cost</div>
-          {!days ? <div className="muted">Loading…</div> : <LineChart area labels={labels} series={[{ name: 'Purchases', color: '#138a52', values: days.map((d) => d.purchases_value) }]} />}
-        </div>
-        <div className="panel">
-          <h2>{all ? 'Stock value by kitchen' : 'Stock value by category'}</h2>
-          <div className="sub">{all ? 'كل مطبخ وقيمة مخزونه الحالية' : 'أعلى 8 فئات بالقيمة'}</div>
-          <BarList items={(all ? s.by_kitchen.map((k) => ({ label: k.name, value: Number(k.value) })) : s.by_category.map((c) => ({ label: c.category, value: Number(c.value) })))} />
-        </div>
-        {all && (
+      <section className="frame">
+        <header><h2>Stock &amp; purchases</h2><span className="muted" dir="auto">{scopeName} · {period} · @ current cost</span></header>
+        <div className="dash-grid">
           <div className="panel">
-            <h2>Stock value by category</h2>
-            <div className="sub">أعلى 8 فئات بالقيمة · كل المطابخ</div>
-            <BarList color="#1f2858" items={s.by_category.map((c) => ({ label: c.category, value: Number(c.value) }))} />
+            <h2>Stock value by day</h2>
+            <div className="sub">قيمة المخزون آخر كل يوم</div>
+            {!days ? <div className="muted">Loading…</div> : <LineChart area labels={labels} series={[{ name: 'Stock value', color: '#d4146f', values: days.map((d) => d.stock_value) }]} />}
           </div>
-        )}
+          <div className="panel">
+            <h2>Purchases by day</h2>
+            <div className="sub">قيمة المشتريات اليومية</div>
+            {!days ? <div className="muted">Loading…</div> : <LineChart area labels={labels} series={[{ name: 'Purchases', color: '#138a52', values: days.map((d) => d.purchases_value) }]} />}
+          </div>
+          <div className="panel">
+            <h2>{all ? 'Stock value by kitchen' : 'Stock value by category'}</h2>
+            <div className="sub">{all ? 'كل مطبخ وقيمة مخزونه الحالية' : 'أعلى 8 فئات بالقيمة'}</div>
+            <BarList items={(all ? s.by_kitchen.map((k) => ({ label: k.name, value: Number(k.value) })) : s.by_category.map((c) => ({ label: c.category, value: Number(c.value) })))} />
+          </div>
+          {all && (
+            <div className="panel">
+              <h2>Stock value by category</h2>
+              <div className="sub">أعلى 8 فئات بالقيمة · كل المطابخ</div>
+              <BarList color="#1f2858" items={s.by_category.map((c) => ({ label: c.category, value: Number(c.value) }))} />
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="frame">
+        <header><h2>Waste</h2><span className="muted" dir="auto">{scopeName} · {period} · @ current cost</span></header>
+        {wasteErr && <div className="alert err" dir="auto">{wasteErr}</div>}
+        <div className="cards">
+          <div className="card"><div className="k">Total waste</div><div className="v">{waste ? money(waste.total_value) : '…'}</div><div className="muted">{waste ? `${waste.docs} waste documents` : ''}</div></div>
+          <div className="card"><div className="k">Waste vs purchases</div><div className="v">{waste && totals.purchases > 0 ? `${((waste.total_value / totals.purchases) * 100).toFixed(1)}%` : '—'}</div><div className="muted">{money(totals.purchases)} purchased</div></div>
+          <div className="card"><div className="k">Top reason</div><div className="v" style={{ fontSize: '1.25rem' }} dir="auto">{waste?.by_reason[0]?.reason ?? '—'}</div><div className="muted">{waste?.by_reason[0] ? money(waste.by_reason[0].value) : ''}</div></div>
+          <div className="card"><div className="k">Most wasted product</div><div className="v mono" style={{ fontSize: '1.15rem' }}>{waste?.top_products[0]?.syt_code ?? '—'}</div><div className="muted" dir="auto">{waste?.top_products[0] ? `${waste.top_products[0].product_name} · ${money(waste.top_products[0].value)}` : ''}</div></div>
+        </div>
+        <div className="dash-grid">
+          <div className="panel">
+            <h2>Biggest waste reasons</h2>
+            <div className="sub">أكبر أسباب الهالك بالقيمة</div>
+            {!waste ? <div className="muted">Loading…</div> : <BarList color="#c62135" items={waste.by_reason.map((r) => ({ label: r.reason, value: Number(r.value) }))} />}
+          </div>
+          <div className="panel">
+            <h2>Waste over time</h2>
+            <div className="sub">الهالك اليومي</div>
+            {!days ? <div className="muted">Loading…</div> : <LineChart area labels={labels} series={[{ name: 'Waste', color: '#c62135', values: days.map((d) => d.waste_value) }]} />}
+          </div>
+          <div className="panel flush">
+            <div className="toolbar"><b>Most wasted products</b></div>
+            <table className="grid">
+              <thead><tr><th>Code</th><th>Product</th><th className="num">Qty (base)</th><th className="num">Value</th></tr></thead>
+              <tbody>
+                {(waste?.top_products ?? []).map((p) => <tr key={p.syt_code}><td className="mono">{p.syt_code}</td><td dir="auto">{p.product_name}</td><td className="num">{fmt(p.qty)}</td><td className="num">{fmt(p.value, 2)}</td></tr>)}
+                {waste && !waste.top_products.length && <tr><td colSpan={4} className="empty">No waste in this period</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section className="frame">
+        <header><h2>Consumption</h2><span className="muted" dir="auto">{scopeName} · @ current cost</span></header>
+        <div className="cards">
+          <div className="card"><div className="k">Usage · period</div><div className="v">{days ? money(totals.usage) : '…'}</div><div className="muted">warehouse issues · {period}</div></div>
+          <div className="card"><div className="k">Avg usage per day</div><div className="v">{days && days.length ? money(totals.usage / days.length) : '—'}</div><div className="muted">{days?.length ?? 0} days</div></div>
+          {(() => {
+            const last = [...(months ?? [])].reverse().find((m) => m.value !== null);
+            return <div className="card"><div className="k">Latest counted month</div><div className="v">{last ? money(last.value as number) : '—'}</div><div className="muted">{last ? `${last.month} · actual consumption after count` : 'No closing count yet'}</div></div>;
+          })()}
+          <div className="card"><div className="k">Months with a count</div><div className="v">{months ? `${months.filter((m) => m.value !== null).length} / ${months.length}` : '…'}</div><div className="muted">last 6 months</div></div>
+        </div>
+        <div className="dash-grid">
+          <div className="panel">
+            <h2>Consumption over time</h2>
+            <div className="sub" dir="auto">الاستهلاك الفعلي بالشهر = Opening + Purchases + Transfers − Closing − Waste. بيظهر للشهور اللي فيها جرد بس.</div>
+            {!months ? <div className="muted">Loading…</div> : months.length === 0 ? <div className="muted" dir="auto">مفيش صلاحية لصفحة Consumption، فالأرقام دي مخفية.</div>
+              : <LineChart area labels={months.map((m) => m.month)} fmtLabel={(l) => l} series={[{ name: 'Consumption', color: '#1f2858', values: months.map((m) => m.value) }]} />}
+          </div>
+          <div className="panel">
+            <h2>Daily usage</h2>
+            <div className="sub" dir="auto">الصرف اليومي من المخزن (Warehouse Transactions) — مؤشر يومي قبل الجرد.</div>
+            {!days ? <div className="muted">Loading…</div> : <LineChart labels={labels} series={[{ name: 'Usage', color: '#8f2bd6', values: days.map((d) => d.usage_value) }]} />}
+          </div>
+        </div>
+      </section>
+
+      <div className="dash-grid">
         <div className="panel">
           <h2>Needs attention</h2>
           {attention.length === 0 ? <div className="muted">كله تمام ✓</div> : (

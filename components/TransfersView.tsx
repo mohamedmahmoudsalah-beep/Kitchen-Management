@@ -1,11 +1,13 @@
 'use client';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { ChevronDown, ChevronRight, FileUp, Pencil, Plus, Undo2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, Plus, Undo2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useScope } from '@/components/ScopeProvider';
 import DocumentEditor from '@/components/DocumentEditor';
 import DocumentLines from '@/components/DocumentLines';
+import PdfButton from '@/components/PdfButton';
+import ImportDropzone from '@/components/ImportDropzone';
+import { documentPdf } from '@/lib/pdf/documents';
 import TemplateButton from '@/components/TemplateButton';
 import ExportButtons from '@/components/ExportButtons';
 import DocFilters from '@/components/DocFilters';
@@ -248,7 +250,7 @@ export default function TransfersView({ canWrite, canReverse, isAdmin, canImport
           <ExportButtons docType="TRANSFER" docs={rows} loadAll={() => fetchAllDocs(supabase, query)} kitchenName={kitchen?.name ?? ''} kitchenNameOf={name}
             fileBase={`kitchens-transfer-${tab === 'out' ? 'outgoing' : 'incoming'}`} />
           {canImport && <TemplateButton module="transfers" />}
-          {canImport && <Link className="btn secondary" href="/import-export?module=transfers"><FileUp size={14} /> Import from file</Link>}
+          {canImport && <ImportDropzone module="transfers" />}
           {canWrite && <button className="btn" onClick={() => { setEditor({ id: null }); setDialog(null); setMsg(null); setTab('out'); }}><Plus size={14} /> New transfer</button>}
         </div>
         <DocFilters q={q} status={status} onQ={setQ} onStatus={setStatus}
@@ -279,6 +281,7 @@ export default function TransfersView({ canWrite, canReverse, isAdmin, canImport
                       <td className="num">{r.document_lines?.[0]?.count ?? 0}</td>
                       <td dir="auto" className="muted">{r.note}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>
+                        <PdfButton title={`Download PDF — ${r.doc_no}`} build={() => documentPdf(supabase, { ...r, doc_type: 'TRANSFER' }, name)} />{' '}
                         {tab === 'out' && canWrite && r.status === 'DRAFT' && (
                           <button className="btn secondary small" onClick={() => { setEditor({ id: r.id }); setDialog(null); setMsg(null); }}><Pencil size={12} /> Edit / Send</button>
                         )}

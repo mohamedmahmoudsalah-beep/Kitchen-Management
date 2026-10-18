@@ -9,6 +9,8 @@ import { fmt } from '@/lib/qty';
 import { groupByGeneric, type Grouped } from '@/lib/group-generic';
 import { invalidateAll, loadCached } from '@/lib/cache';
 import { lastPurchased } from '@/lib/import/ambiguous';
+import PdfButton from '@/components/PdfButton';
+import { reportPdf } from '@/lib/pdf/documents';
 
 type R = {
   product_id: string; syt_code: string; generic_code: string | null; product_name: string; category: string | null;
@@ -106,6 +108,18 @@ export default function StockReportView({ kind }: { kind: 'stock' | 'consumption
     ...cols.map((c) => Number(r[c.key] ?? 0)), Math.round(Number(r.cost_per_uom) * 10000) / 10000, Math.round(value(r) * 100) / 100]);
   const fileBase = `${kind === 'stock' ? 'warehouse-stock' : 'consumption'}-${kitchen?.code ?? ''}-${from}_${to}`;
 
+  // PDF: نفس الصفوف المعروضة (مجمّعة أو لا)، landscape
+  const pdf = () => reportPdf({
+    title: kind === 'stock' ? 'Warehouse Stock' : 'Consumption',
+    subtitle: `${kitchen?.name ?? ''} · ${from} → ${to}`,
+    meta: [['Kitchen', kitchen?.name ?? ''], ['Period', `${from} → ${to}`], ['Products', String(shown.length)], ['Grouped by Generic Code', byGeneric ? 'Yes' : 'No']],
+    cols: [{ head: 'Code', w: 11 }, { head: 'Product', w: 30 }, ...cols.map((c) => ({ head: c.label, w: 8.5, align: 'right' as const })), { head: 'Value @ current cost', w: 11, align: 'right' as const }],
+    rows: shown.map((r) => [r.syt_code, r.product_name, ...cols.map((c) => fmt(r[c.key] ?? 0)), fmt(value(r), 2)]),
+    foot: ['', 'Total value', ...cols.map(() => ''), fmt(total, 2)],
+    note: kind === 'consumption' ? 'Quantities are in base units (kg). Consumption = Opening + Purchases + Transfer In − Transfer Out − Closing − Waste.' : 'Quantities are in base units (kg).',
+    fileBase: `${kind === 'stock' ? 'warehouse-stock' : 'consumption'}-${kitchen?.code ?? ''}-${from}_${to}`,
+  });
+
   const first = rows[0];
   const noClosing = kind === 'consumption' && rows.length > 0 && !first?.has_closing;
   const cutoff = kind === 'consumption' && first?.has_closing && first.closing_date && first.closing_date < to ? first.closing_date : null;
@@ -122,6 +136,7 @@ export default function StockReportView({ kind }: { kind: 'stock' | 'consumption
         <span className="muted" dir="auto">{kitchen?.name} · {from} → {to} · {shown.length} منتج</span>
         <span className="spacer" />
         <button className="btn secondary" title="تحديث البيانات" onClick={() => { invalidateAll(); setNonce((n) => n + 1); }}><RefreshCw size={14} /> Refresh</button>
+        <PdfButton label="PDF" title="تحميل PDF بالصفوف المعروضة" disabled={!shown.length} build={pdf} />
         <button className="btn secondary" disabled={!shown.length} onClick={() => downloadCsv(`${fileBase}.csv`, head, exportRows())}><Download size={14} /> CSV</button>
         <button className="btn secondary" disabled={!shown.length} onClick={() => downloadXlsx(`${fileBase}.xlsx`, head, exportRows())}><Download size={14} /> XLSX</button>
       </div>

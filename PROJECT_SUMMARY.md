@@ -1,8 +1,8 @@
-# ملخص مشروع Kitchen Management System (KMS) — آخر تحديث: الدفعة 15
+# ملخص مشروع Kitchen Management System (KMS) — آخر تحديث: الدفعة 16
 
 **الهدف:** ERP صغير لمطابخ Breadfast (Plus Mall, Rehab, Maadi, NC7). بديل لمحاولة Apps Script القديمة اللي كانت بطيئة.
 **التقنيات (قرار نهائي، كله مجاني):** Supabase (Postgres + Auth + RLS) + Next.js 15 / TypeScript على Vercel + تسجيل دخول Google. Excel وSheets للتصدير فقط.
-**آخر تسليم:** `kms-batch15.zip` (المشروع الكامل). الـ migrations بالترتيب في `supabase/migrations`: `001` لحد `022`. الأوامر: `supabase/tests/run_tests.sh` (SQL على Postgres محلي)، `npx vitest run` (83 اختبار) + SQL على PGlite: `node supabase/tests/110_tests_batch9.mjs` و`120_tests_batch10.mjs` و`130_tests_batch11.mjs` و`140_security_audit.mjs` (اختبارات اعتداء + حواجز دائمة) (بعد `npm i --no-save @electric-sql/pglite`)، `npm run build` لازم ينجح قبل أي تسليم.
+**آخر تسليم:** `kms-batch16.zip` (المشروع الكامل). الـ migrations بالترتيب في `supabase/migrations`: `001` لحد `023`. الأوامر: `supabase/tests/run_tests.sh` (SQL على Postgres محلي)، `npx vitest run` (100 اختبار) + SQL على PGlite: `node supabase/tests/110_tests_batch9.mjs` و`120_tests_batch10.mjs` و`130_tests_batch11.mjs` و`140_security_audit.mjs` و`150_tests_batch15.mjs` (اختبارات اعتداء + حواجز دائمة) (بعد `npm i --no-save @electric-sql/pglite`)، `npm run build` لازم ينجح قبل أي تسليم.
 
 ## الأدوار
 - **Admin:** كل حاجة. الـ Root `mohamed.mahmoudsalah@breadfast.com` مينفعش يتعطل أو يتحذف.
@@ -42,6 +42,10 @@
 - **الأمان (الدفعة 13):** اتعملت مراجعة كاملة، والتفاصيل في `SECURITY.md` (اللي اتصلّح + اللي لازم تعمله بإيدك). أهم الحاجات: الريبو يبقى Private، Google بس في Supabase Auth، شغّل Migration `021`، وقبل التشغيل للناس شغّل `supabase/go-live/drop_reset_all_data.sql`. زرار "مسح كل البيانات" مخفي افتراضيًا (`NEXT_PUBLIC_ENABLE_RESET=1` لإظهاره).
 - **(الدفعة 14)** المستخدم اللي الـ Admin عطّله بيتعلّم `disabled_by_admin`: الـ Manager مبيشوفه ولا يوافق عليه، والـ Admin بس يفعّله تاني. الـ Manager بيوافق على المعلّقين الجداد واللي تحته بس.
 - **صفحة الدخول (الدفعة 15):** تصميم `breadfast-kitchen-portal` (صورة المقر + أنيميشن) متطبق على الدخول بجوجل بس (من غير يوزر/باسورد/Forgot/Remember). الستايل في `app/login/login.css` كله بـ prefix `kp-` ومعزول (اختبار `tests/login-css.test.ts` بيمنع أي تسرّب على باقي النظام)، والصور في `public/login/`. فيها رسائل الأخطاء (`explainAuthError`) وحالة Redirecting، وجملة بالعربي لأول مرة.
+- **(الدفعة 16) Import sheet:** زرار الاستيراد بقى كبير (Dropzone): اسحب الشيت عليه أو دوس واختار الملف، وبيروح لصفحة الـ Import والملف متحمّل (`components/ImportDropzone.tsx` + `lib/import/handoff.ts`، الملف في الذاكرة بس).
+- **(الدفعة 16) Dashboard:** إطارات Stock & purchases / **Waste** (إجمالي، % من المشتريات، أكبر أسباب الهالك، أكتر المنتجات هالكًا، الهالك عبر الزمن) / **Consumption** (الاستخدام، متوسط اليوم، الاستهلاك الفعلي بالشهر بعد الجرد عبر الزمن، الصرف اليومي). `dashboard_waste` و`dashboard_consumption_months`. الاستهلاك الشهري بيظهر للشهور اللي فيها جرد Posted بس (غير كده فاضي، مش رقم مزيف) وبيختفي لو المستخدم معندوش صفحة Consumption.
+- **(الدفعة 16) PDF:** أيقونة تحميل PDF جنب كل مستند (Purchases / Warehouse Txn / Waste / Adjustments / Opening / **Closing** / **Transfers**) وزرار PDF في Warehouse Stock / Consumption / Low Stock. PDF حقيقي (نص مش صورة) بيتبني في المتصفح: jsPDF + autoTable + خط Cairo (مضمّن، SIL OFL) + تشكيل وترتيب عربي (`lib/pdf/`). التحويل فيه خانات توقيع المرسل والمستلم.
+- **(الدفعة 16) الجرد:** الجرد = Opening الشهر اللي بعده، وتعديل أي سطر فيه بيوصل للشهر اللي بعده (متأكد باختبار). قايمة Period lock بتعرض الفترات المقفولة اللي بتتقاطع مع From/To بس، فلما تعدّي لشهر جديد القديمة بتختفي وبتظهر لما تفلتر على شهرها.
 - Consumption = Opening + Purchases + Transfer In − Transfer Out − Closing − Waste. Warehouse Stock = Opening + Purchases + Confirmed Transfer In − Transfer Out − Warehouse Txn − Waste + Adjustments. Dashboard: قيمة المخزون وقايمة Needs attention.
 - **Export (Excel + CSV) على كل صفحات المستندات:** صف لكل صنف (Doc No, Date, Status, Lines, Note + المنتجات) ويطلّع كل المستندات المطابقة مش بس اللي على الشاشة.
 - قوايم المستندات: 100 في المرة + Load more + بحث (Doc No / ملاحظة / كود أو اسم منتج) + فلتر الحالة.

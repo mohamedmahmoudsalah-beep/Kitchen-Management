@@ -2,16 +2,16 @@
 import { useState } from 'react';
 import { compact, linePath, nearestIndex, niceTicks } from '@/lib/chart';
 
-export type Series = { name: string; color: string; values: number[] };
+export type Series = { name: string; color: string; values: (number | null)[] };
 
 const W = 640, H = 250, L = 52, R = 14, T = 14, B = 28;
 const shortDay = (d: string) => d.slice(5);   // MM-DD
 
 // رسم خطوط بالأيام (SVG). hover بيطلّع قيمة كل خط في اليوم
-export function LineChart({ labels, series, area = false }: { labels: string[]; series: Series[]; area?: boolean }) {
+export function LineChart({ labels, series, area = false, fmtLabel = shortDay }: { labels: string[]; series: Series[]; area?: boolean; fmtLabel?: (l: string) => string }) {
   const [hover, setHover] = useState<number | null>(null);
   const n = labels.length;
-  const max = Math.max(0, ...series.flatMap((s) => s.values));
+  const max = Math.max(0, ...series.flatMap((s) => s.values.filter((v): v is number => v !== null)));
   const ticks = niceTicks(max);
   const top = ticks[ticks.length - 1] || 1;
   const pw = W - L - R, ph = H - T - B;
@@ -36,26 +36,26 @@ export function LineChart({ labels, series, area = false }: { labels: string[]; 
           </g>
         ))}
         {labels.map((d, i) => (i % step === 0 || i === n - 1) && (
-          <text key={d} x={x(i)} y={H - 8} textAnchor="middle" fontSize={11} fill="var(--muted)">{shortDay(d)}</text>
+          <text key={d} x={x(i)} y={H - 8} textAnchor="middle" fontSize={11} fill="var(--muted)">{fmtLabel(d)}</text>
         ))}
         {series.map((s) => (
           <g key={s.name}>
-            {area && n > 1 && <path d={`${linePath(xs, s.values.map(y))}L${x(n - 1)},${y(0)}L${x(0)},${y(0)}Z`} fill={s.color} opacity={0.1} />}
-            <path d={linePath(xs, s.values.map(y))} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" />
-            {n <= 45 && s.values.map((v, i) => <circle key={i} cx={x(i)} cy={y(v)} r={2.2} fill={s.color} />)}
+            {area && n > 1 && !s.values.includes(null) && <path d={`${linePath(xs, s.values.map((v) => (v === null ? null : y(v))))}L${x(n - 1)},${y(0)}L${x(0)},${y(0)}Z`} fill={s.color} opacity={0.1} />}
+            <path d={linePath(xs, s.values.map((v) => (v === null ? null : y(v))))} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" />
+            {n <= 45 && s.values.map((v, i) => (v === null ? null : <circle key={i} cx={x(i)} cy={y(v)} r={2.2} fill={s.color} />))}
           </g>
         ))}
         {hover !== null && (
           <g pointerEvents="none">
             <line x1={x(hover)} x2={x(hover)} y1={T} y2={T + ph} stroke="var(--muted)" strokeDasharray="3 3" />
-            {series.map((s) => <circle key={s.name} cx={x(hover)} cy={y(s.values[hover])} r={4} fill="#fff" stroke={s.color} strokeWidth={2} />)}
+            {series.map((s) => (s.values[hover] === null ? null : <circle key={s.name} cx={x(hover)} cy={y(s.values[hover] as number)} r={4} fill="#fff" stroke={s.color} strokeWidth={2} />))}
           </g>
         )}
       </svg>
       {hover !== null && (
         <div className="chart-tip" style={{ left: `${(x(hover) / W) * 100}%` }}>
           <b>{labels[hover]}</b>
-          {series.map((s) => <div key={s.name}><i style={{ background: s.color }} />{s.name}: {Math.round(s.values[hover]).toLocaleString('en-US')}</div>)}
+          {series.map((s) => <div key={s.name}><i style={{ background: s.color }} />{s.name}: {s.values[hover] === null ? '—' : Math.round(s.values[hover] as number).toLocaleString('en-US')}</div>)}
         </div>
       )}
       {series.length > 1 && (

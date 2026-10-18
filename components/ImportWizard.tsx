@@ -10,6 +10,7 @@ import { MODULES, MODULE_ORDER, mapRows, FIELD_LABEL, type ImportModule, type Ma
 import { readTable } from '@/lib/import/parse-file';
 import { downloadCsv, ymd } from '@/lib/export';
 import TemplateButton from '@/components/TemplateButton';
+import { takePendingImportFile } from '@/lib/import/handoff';
 import { applyChoices, findAmbiguous, initialChoices, lastPurchased, loadProductsForCodes, type Ambig } from '@/lib/import/ambiguous';
 
 type Phase = 'idle' | 'parsed' | 'validating' | 'invalid' | 'valid' | 'committing' | 'done';
@@ -84,6 +85,13 @@ export default function ImportWizard({ allowed, isAdmin, fixedModule, initialMod
     }
   }
 
+  // ملف اتسحب/اتختار من صفحة تانية (زرار Import sheet): نحمّله على طول
+  useEffect(() => {
+    const f = takePendingImportFile();
+    if (f) void onFile(f);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function onModuleChange(m: ImportModule) {
     setModule(m);
     reset(false);
@@ -139,7 +147,7 @@ export default function ImportWizard({ allowed, isAdmin, fixedModule, initialMod
         : module === 'transfers'
         ? `اتبعت ${res.documents} تحويل (${res.lines} سطر) من ${batchKitchen} وبقوا In Transit — المطبخ المستلم يأكد الكمية الفعلية من صفحته.`
         : module === 'closing'
-        ? `اتسجل الجرد (${res.lines} سطر) للمطبخ ${batchKitchen}، والفروق عن رصيد الدفتر اتسجلت تلقائيًا كتسوية Count Correction.`
+        ? `اتسجل الجرد (${res.lines} سطر) للمطبخ ${batchKitchen}، والفروق عن رصيد الدفتر اتسجلت تلقائيًا كتسوية Count Correction. الجرد ده بقى رصيد أول المدة (Opening) للشهر اللي بعده، ولو عدّلت أي منتج فيه بيوصل للشهر اللي بعده تلقائي. لقفل الفترة روح لـ Closing / Stock Count ← Period lock.`
         : `اتحفظ ${res.lines} سطر في ${res.documents} مستند (Posted) للمطبخ ${batchKitchen}.`;
       setMessage({ kind: 'ok', text }); setPhase('done'); onDone?.();
     } catch (e) {

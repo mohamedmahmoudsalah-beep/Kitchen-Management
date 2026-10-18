@@ -1,11 +1,13 @@
 'use client';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { ChevronDown, ChevronRight, FileUp, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useScope } from '@/components/ScopeProvider';
 import DocumentEditor, { type EditorDocType } from '@/components/DocumentEditor';
 import DocumentLines from '@/components/DocumentLines';
+import PdfButton from '@/components/PdfButton';
+import ImportDropzone from '@/components/ImportDropzone';
+import { documentPdf } from '@/lib/pdf/documents';
 import TemplateButton from '@/components/TemplateButton';
 import type { ImportModule } from '@/lib/import/columns';
 import ExportButtons from '@/components/ExportButtons';
@@ -68,6 +70,7 @@ export default function DocumentsView({ docType, importModule, canWrite, canReve
   }
 
   // تعديل سطر واحد في مستند Posted بدل Reverse للمستند كله (المشتريات للـ Admin بس زي الـ Reverse)
+  const kitchenName = (id: string | null | undefined) => kitchens.find((k) => k.id === id)?.name ?? '—';
   const lineEditable = (r: DocumentRow) => canReverse && (docType !== 'PURCHASE' || isAdmin) && r.status === 'POSTED' && !r.reverses_document_id
     && !r.doc_no.startsWith('ARC-') && !(r.note ?? '').startsWith('Count variance of');
 
@@ -92,9 +95,14 @@ export default function DocumentsView({ docType, importModule, canWrite, canReve
           <span className="spacer" />
           {manual && canWrite && <button className="btn" onClick={() => { setEditor({ id: null }); setMsg(null); }}><Plus size={14} /> New</button>}
           {canImport && importModule && <TemplateButton module={importModule as ImportModule} />}
-          {canImport && importModule && <Link className="btn secondary" href={`/import-export?module=${importModule}`}><FileUp size={14} /> Import from file</Link>}
+          {canImport && importModule && <ImportDropzone module={importModule} />}
           <ExportButtons docType={docType} docs={rows} loadAll={() => fetchAllDocs(supabase, query)} kitchenName={kitchen?.name ?? ''} />
         </div>
+        {docType === 'CLOSING' && (
+          <div className="muted" style={{ padding: '6px 12px' }} dir="auto">
+            كل جرد بيتحوّل تلقائيًا لـ Opening الشهر اللي بعده، وأي تعديل في سطر جرد بيوصل للشهر اللي بعده. بيظهر هنا جرد التاريخ المختار فوق بس — غيّر From / To عشان تشوف شهور تانية.
+          </div>
+        )}
         <DocFilters q={q} status={status} onQ={setQ} onStatus={setStatus}
           statuses={[{ value: 'DRAFT', label: 'Draft' }, { value: 'POSTED', label: 'Posted' }, { value: 'REVERSED', label: 'Reversed' }]} />
         {msg && <div className={`alert ${msg.kind}`} style={{ margin: 12 }} dir="auto">{msg.text}</div>}
@@ -133,6 +141,7 @@ export default function DocumentsView({ docType, importModule, canWrite, canReve
                     <td className="num">{r.document_lines?.[0]?.count ?? 0}</td>
                     <td dir="auto" className="muted">{r.note}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
+                      <PdfButton title={`Download PDF — ${r.doc_no}`} build={() => documentPdf(supabase, { ...r, doc_type: docType, kitchen_id: kitchenId }, kitchenName)} />{' '}
                       {manual && canWrite && r.status === 'DRAFT' && (
                         <button className="btn secondary small" onClick={() => { setEditor({ id: r.id }); setMsg(null); }}><Pencil size={12} /> Edit</button>
                       )}{' '}

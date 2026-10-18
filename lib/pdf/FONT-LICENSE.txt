@@ -1,0 +1,1 @@
+Cairo font: Copyright 2016 The Cairo Project Authors. SIL Open Font License 1.1 (https://openfontlicense.org). Subset of Cairo Regular/Bold used for PDF export.
