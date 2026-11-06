@@ -74,7 +74,7 @@ export default function PeriodsPanel({ canManage, isAdmin }: { canManage: boolea
               <button className="btn" disabled={!range || step !== 'idle'} onClick={startClose}><Lock size={14} /> {step === 'downloading' ? 'Downloading…' : 'Download pages & close'}</button>
               {step === 'downloading' && <span className="muted">{progress}</span>}
             </div>
-            <div className="muted" style={{ marginTop: 6 }}>القفل بشهور كاملة بس{range ? ` (${range.from} → ${range.to})` : ''}. الأول بينزّل كل صفحات المطبخ للفترة دي Excel، وبعدها بيطلب تأكيد القفل. بعد القفل مفيش حد غير الـ Admin يضيف أو يعدّل أو يمسح فيها.</div>
+            <div className="muted" style={{ marginTop: 6 }}>القفل بشهور كاملة بس{range ? ` (${range.from} → ${range.to})` : ''}. الأول بينزّل كل صفحات المطبخ للفترة دي Excel، وبعدها بيطلب تأكيد القفل. بعد القفل مفيش حد غير الـ Admin يضيف أو يعدّل أو يمسح فيها. وبيتحفظ ملخص المبيعات والاستهلاك (فعلي vs مبيعات) لكل شهر، وبتتمسح داتا المبيعات الخام بتاعت الشهر.</div>
             {step === 'confirm' && range && (
               <div className="alert warn" style={{ marginTop: 10 }}>
                 <div>اتنزّل ملف الصفحات. تأكيد قفل <b>{range.from} → {range.to}</b> للمطبخ <b>{kitchen?.name}</b>؟</div>

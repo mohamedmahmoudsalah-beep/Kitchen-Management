@@ -4,7 +4,7 @@ export const PAGE_HREF: Record<string, string> = {
   opening_balance: '/opening-balance',
   purchases: '/purchases',
   kitchens_transfer: '/kitchens-transfer',
-  warehouse_transactions: '/warehouse-transactions',
+  sales: '/sales',
   waste: '/waste',
   closing_stock_count: '/closing-stock-count',
   consumption: '/consumption',
@@ -12,6 +12,7 @@ export const PAGE_HREF: Record<string, string> = {
   low_stock: '/low-stock',
   stock_adjustments: '/stock-adjustments',
   data_product: '/data-product',
+  bom: '/bom',
   import_export: '/import-export',
   import_errors: '/import-errors',
   access_control: '/access-control',
@@ -20,14 +21,17 @@ export const PAGE_HREF: Record<string, string> = {
 
 export const NAV_GROUPS: { title: string; keys: string[] }[] = [
   { title: 'Overview', keys: ['dashboard'] },
-  { title: 'Operations', keys: ['opening_balance', 'purchases', 'kitchens_transfer', 'warehouse_transactions', 'waste', 'closing_stock_count', 'stock_adjustments'] },
+  { title: 'Operations', keys: ['opening_balance', 'purchases', 'kitchens_transfer', 'sales', 'waste', 'closing_stock_count', 'stock_adjustments'] },
   { title: 'Reports', keys: ['consumption', 'warehouse_stock', 'low_stock'] },
-  { title: 'Data', keys: ['data_product', 'import_export', 'import_errors'] },
+  { title: 'Data', keys: ['data_product', 'bom', 'import_export', 'import_errors'] },
   { title: 'Admin', keys: ['access_control', 'audit_log'] },
 ];
 
 // صفحات مش مرتبطة بمطبخ/فترة
-export const GLOBAL_PAGES = new Set(['data_product', 'access_control']);
+export const GLOBAL_PAGES = new Set(['data_product', 'bom', 'access_control']);
+
+// صفحات اتشالت من الواجهة (الصف فاضل في الـ DB عشان مستندات قديمة) — مبتظهرش في الـ Sidebar ولا في Access Control
+export const HIDDEN_PAGES = new Set(['warehouse_transactions']);
 
 // صفحات لايف (الرصيد الحالي) من غير فلتر تواريخ
 export const NO_DATE_PAGES = new Set(['low_stock']);
@@ -36,7 +40,6 @@ export const NO_DATE_PAGES = new Set(['low_stock']);
 export const IMPORT_MODULE_OF_PAGE: Record<string, string> = {
   opening_balance: 'opening',
   purchases: 'purchases',
-  warehouse_transactions: 'wh_txn',
   waste: 'waste',
   stock_adjustments: 'adjustments',
   closing_stock_count: 'closing',
@@ -46,7 +49,6 @@ export const IMPORT_MODULE_OF_PAGE: Record<string, string> = {
 export const DOC_TYPE_OF_PAGE: Record<string, string> = {
   opening_balance: 'OPENING',
   purchases: 'PURCHASE',
-  warehouse_transactions: 'WH_TXN',
   waste: 'WASTE',
   stock_adjustments: 'ADJUSTMENT',
   closing_stock_count: 'CLOSING',

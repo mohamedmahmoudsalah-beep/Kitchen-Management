@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ListPlus, Plus, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import ProductPicker, { type ProductLite } from '@/components/ProductPicker';
+import FpPicker, { type FpLite } from '@/components/FpPicker';
 import { fmt, toBase, toPieces, type QtyMode } from '@/lib/qty';
 import { ymd } from '@/lib/export';
 import type { Kitchen, Reason } from '@/lib/types';
@@ -17,6 +18,8 @@ type Line = {
   reasonId: string;
   direction: '' | 'INCREASE' | 'DECREASE';
   note: string;
+  isFp: boolean;            // سطر منتج تام (Waste): بيتفرد على RM الـ BOM وقت الحفظ
+  fp: FpLite | null;
 };
 
 const TITLES: Record<EditorDocType, string> = {
@@ -28,7 +31,8 @@ const POST_LABEL: Record<EditorDocType, string> = {
 };
 
 let seq = 1;
-const newLine = (): Line => ({ key: seq++, product: null, qty: '', mode: 'BASE', reasonId: '', direction: '', note: '' });
+const newLine = (): Line => ({ key: seq++, product: null, qty: '', mode: 'BASE', reasonId: '', direction: '', note: '', isFp: false, fp: null });
+const newFpLine = (): Line => ({ ...newLine(), isFp: true });
 
 export default function DocumentEditor({ docType, kitchenId, kitchenName, kitchens, docId, isAdmin, defaultDate, onClose, onChanged }: {
   docType: EditorDocType; kitchenId: string; kitchenName: string; kitchens: Kitchen[]; docId: string | null;
@@ -65,16 +69,27 @@ export default function DocumentEditor({ docType, kitchenId, kitchenName, kitche
       const [{ data: d }, { data: ls }] = await Promise.all([
         supabase.from('documents').select('doc_date,note,counterpart_kitchen_id').eq('id', docId).maybeSingle(),
         supabase.from('document_lines')
-          .select('line_no,qty_input,input_mode,qty_base,reason_id,note,products(id,syt_code,generic_code,name,uom_factor,cost_per_uom)')
+          .select('line_no,qty_input,input_mode,qty_base,reason_id,note,fp_ref,fp_name,fp_qty,fp_line,products(id,syt_code,generic_code,name,uom_factor,cost_per_uom)')
           .eq('document_id', docId).order('line_no'),
       ]);
       if (d) { setDate(d.doc_date); setNote(d.note ?? ''); setCounterpart(d.counterpart_kitchen_id ?? ''); }
-      setLines(((ls ?? []) as unknown as {
+      type Ld = {
         qty_input: number; input_mode: QtyMode; qty_base: number; reason_id: string | null; note: string | null; products: ProductLite;
-      }[]).map((l) => ({
-        key: seq++, product: l.products, qty: String(Number(l.qty_input)), mode: l.input_mode, reasonId: l.reason_id ?? '',
-        direction: docType === 'ADJUSTMENT' ? (Number(l.qty_base) < 0 ? 'DECREASE' : 'INCREASE') : '', note: l.note ?? '',
-      })));
+        fp_ref: string | null; fp_name: string | null; fp_qty: number | null; fp_line: number | null;
+      };
+      const out: Line[] = []; const seenFp = new Set<number>();
+      for (const l of (ls ?? []) as unknown as Ld[]) {
+        if (l.fp_ref) {            // سطور الـ RM اللي طالعة من منتج تام بترجع سطر واحد
+          const k = l.fp_line ?? -1;
+          if (k >= 0 && seenFp.has(k)) continue;
+          if (k >= 0) seenFp.add(k);
+          out.push({ ...newFpLine(), fp: { id: l.fp_ref, name: l.fp_name ?? l.fp_ref }, qty: String(Number(l.fp_qty ?? 0)), reasonId: l.reason_id ?? '', note: l.note ?? '' });
+          continue;
+        }
+        out.push({ ...newLine(), product: l.products, qty: String(Number(l.qty_input)), mode: l.input_mode, reasonId: l.reason_id ?? '',
+          direction: docType === 'ADJUSTMENT' ? (Number(l.qty_base) < 0 ? 'DECREASE' : 'INCREASE') : '', note: l.note ?? '' });
+      }
+      setLines(out.length ? out : [newLine()]);
       setLoading(false);
     })();
   }, [supabase, docId, docType]);
@@ -103,7 +118,7 @@ export default function DocumentEditor({ docType, kitchenId, kitchenName, kitche
   };
   const baseOf = (l: Line): number | null => {
     const n = Number(l.qty);
-    if (!l.product || l.qty.trim() === '' || !Number.isFinite(n)) return null;
+    if (l.isFp || !l.product || l.qty.trim() === '' || !Number.isFinite(n)) return null;
     return toBase(n, l.mode, Number(l.product.uom_factor));
   };
 
@@ -123,6 +138,13 @@ export default function DocumentEditor({ docType, kitchenId, kitchenName, kitche
   const problems: string[] = [];
   lines.forEach((l, i) => {
     const n = i + 1;
+    if (l.isFp) {
+      if (!l.fp) { problems.push(`سطر ${n}: اختار المنتج التام`); return; }
+      const fq = Number(l.qty);
+      if (l.qty.trim() === '' || !Number.isFinite(fq) || fq <= 0) problems.push(`سطر ${n}: كمية المنتج التام لازم تكون أكبر من صفر`);
+      if (!l.reasonId) problems.push(`سطر ${n}: اختار السبب`);
+      return;
+    }
     if (!l.product) { problems.push(`سطر ${n}: اختار المنتج`); return; }
     const q = Number(l.qty);
     if (l.qty.trim() === '' || !Number.isFinite(q)) problems.push(`سطر ${n}: اكتب الكمية`);
@@ -157,7 +179,9 @@ export default function DocumentEditor({ docType, kitchenId, kitchenName, kitche
   }
 
   async function save(): Promise<string | null> {
-    const payload = lines.map((l) => ({
+    const payload = lines.map((l) => l.isFp ? ({
+      fp_id: l.fp?.id, qty: l.qty.trim(), reason_id: l.reasonId || undefined, note: l.note || undefined,
+    }) : ({
       product_id: l.product?.id, qty: l.qty.trim(), mode: l.mode,
       reason_id: l.reasonId || undefined, direction: docType === 'ADJUSTMENT' ? effDirection(l) || undefined : undefined,
       note: l.note || undefined,
@@ -240,6 +264,26 @@ export default function DocumentEditor({ docType, kitchenId, kitchenName, kitche
               <tbody>
                 {lines.map((l, i) => {
                   const b = baseOf(l);
+                  if (l.isFp) {
+                    return (
+                      <tr key={l.key}>
+                        <td>{i + 1}</td>
+                        <td><FpPicker value={l.fp} onChange={(p) => setLine(l.key, { fp: p })} /></td>
+                        <td className="num muted" title="الـ RM بتتخصم من الـ BOM والرصيد يقدر يبقى سالب">—</td>
+                        <td><input type="text" inputMode="decimal" value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} style={{ width: 90 }} /></td>
+                        <td className="muted">pcs</td>
+                        <td className="muted" dir="auto">بيخصم RM الـ BOM</td>
+                        <td>
+                          <select value={l.reasonId} onChange={(e) => setLine(l.key, { reasonId: e.target.value })} dir="auto">
+                            <option value="">— reason —</option>
+                            {reasonOptions.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                          </select>
+                        </td>
+                        <td><input type="text" value={l.note} onChange={(e) => setLine(l.key, { note: e.target.value })} dir="auto" style={{ width: 140 }} /></td>
+                        <td><button className="icon-btn" style={{ color: 'var(--muted)' }} onClick={() => setLines((ls) => (ls.length > 1 ? ls.filter((x) => x.key !== l.key) : [newLine()]))} title="Remove line"><Trash2 size={14} /></button></td>
+                      </tr>
+                    );
+                  }
                   const f = Number(l.product?.uom_factor ?? 1);
                   const avail = l.product ? balances[l.product.id] ?? 0 : null;
                   const over = l.product && outByProduct[l.product.id] > (balances[l.product.id] ?? 0) + 1e-9;
@@ -299,10 +343,14 @@ export default function DocumentEditor({ docType, kitchenId, kitchenName, kitche
           ))}
           <div className="form-row" style={{ marginTop: 10 }}>
             <button className="btn secondary small" onClick={() => setLines((ls) => [...ls, newLine()])}><Plus size={13} /> Add line</button>
+            {docType === 'WASTE' && <button className="btn secondary small" onClick={() => setLines((ls) => [...ls, newFpLine()])}><Plus size={13} /> Add finished product</button>}
             {docType === 'CLOSING' && <button className="btn secondary small" onClick={loadStockList}><ListPlus size={13} /> Load stock list</button>}
             <span className="muted">{lines.length} lines</span>
           </div>
 
+          {docType === 'WASTE' && lines.some((l) => l.isFp) && (
+            <div className="muted" style={{ marginTop: 8 }} dir="auto">المنتج التام بيتفرد وقت الحفظ على الـ RM بتاعته من الـ BOM (الكمية بالقطعة)، وبيخصمها من المخزن حتى لو الرصيد هيبقى سالب.</div>
+          )}
           {problems.length > 0 && (
             <div className="alert warn" style={{ marginTop: 12 }} dir="auto">
               {problems.slice(0, 6).map((p, i) => <div key={i}>{p}</div>)}

@@ -16,7 +16,7 @@ export type CardRow = {
 
 export const MOVE_LABEL: Record<string, string> = {
   OPENING: 'Opening', PURCHASE: 'Purchase', TRANSFER_OUT: 'Transfer out', TRANSFER_IN: 'Transfer in', TRANSFER_RETURN_IN: 'Return received',
-  WH_TXN: 'Warehouse txn', WASTE: 'Waste', ADJ_PLUS: 'Adjustment +', ADJ_MINUS: 'Adjustment −', TRANSIT_IN: 'In transit (+)',
+  WH_TXN: 'Warehouse txn', SALES_RM: 'Sales (BOM)', WASTE: 'Waste', ADJ_PLUS: 'Adjustment +', ADJ_MINUS: 'Adjustment −', TRANSIT_IN: 'In transit (+)',
   TRANSIT_OUT: 'In transit (−)', RETURN_HOLD_IN: 'Return pending (+)', RETURN_HOLD_OUT: 'Return pending (−)', CLOSING_COUNT: 'Closing count',
 };
 const LOC: Record<string, string> = { WAREHOUSE: 'Warehouse', IN_TRANSIT: 'In transit', RETURN_PENDING: 'Return pending' };

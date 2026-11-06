@@ -14,14 +14,15 @@ export const clearPagePhrase = (page: string, kitchenCode?: string | null) => `C
 export const ARCHIVE_PAGES = [
   { type: 'OPENING', title: 'Opening Balance' }, { type: 'PURCHASE', title: 'Purchases' }, { type: 'TRANSFER', title: 'Kitchens Transfer' },
   { type: 'WH_TXN', title: 'Warehouse Transactions' }, { type: 'WASTE', title: 'Waste' }, { type: 'CLOSING', title: 'Closing Stock Count' },
-  { type: 'ADJUSTMENT', title: 'Stock Adjustments' },
+  { type: 'ADJUSTMENT', title: 'Stock Adjustments' }, { type: 'SALES', title: 'Sales (BOM deduction)' },
 ] as const;
 
 type RepRow = Record<string, unknown>;
 const STOCK_COLS: [string, string][] = [['opening', 'Opening'], ['purchases', '+ Purchases'], ['transfer_in', '+ Transfer In'], ['transfer_out', '− Transfer Out'],
-  ['warehouse_txn', '− Warehouse Txn'], ['waste', '− Waste'], ['adjustments', '± Adjustments'], ['closing_book', '= Stock'], ['in_transit', 'In transit'], ['return_pending', 'Return pending']];
+  ['warehouse_txn', '− Warehouse Txn'], ['sales_rm', '− Sales (BOM)'], ['waste', '− Waste'], ['adjustments', '± Adjustments'], ['closing_book', '= Stock'], ['in_transit', 'In transit'], ['return_pending', 'Return pending']];
 const CONS_COLS: [string, string][] = [['opening', 'Opening'], ['purchases', '+ Purchases'], ['transfer_in', '+ Transfer In'], ['transfer_out', '− Transfer Out'],
-  ['closing', '− Closing (count)'], ['waste', '− Waste'], ['consumption', '= Consumption']];
+  ['closing', '− Closing (count)'], ['waste', '− Waste'], ['consumption', '= Consumption'],
+  ['sales_consumption', 'From sales (BOM)'], ['variance', 'Variance (actual − sales)']];
 
 export function reportTable(kind: 'stock' | 'consumption', rows: RepRow[]) {
   const cols = kind === 'stock' ? STOCK_COLS : CONS_COLS;
@@ -80,6 +81,17 @@ export async function buildArchive(sb: SupabaseClient, o: {
           summary.push(`${label} · ${k.name}: ${rows.length} products`);
         } catch (e) { summary.push(`${label} · ${k.name}: skipped (${e instanceof Error ? e.message : String(e)})`); }
       }
+      // ملخص المبيعات الخام (بيتمسح عند قفل الشهر بعد ما الملخص يتحفظ في الداتا بيز)
+      o.onProgress?.(`Sales summary · ${k.name}…`);
+      try {
+        const { data, error } = await sb.rpc('sales_live', { p_kitchen: k.id, p_from: o.from, p_to: o.to });
+        if (error) throw new Error(error.message);
+        const prods = ((data as { products?: { pid: string; name: string | null; qty: number; days: number; has_bom: boolean }[] })?.products ?? []);
+        if (!prods.length) { summary.push(`Sales summary · ${k.name}: no data`); continue; }
+        files.push({ name: `Sales summary - ${k.name}.xlsx`, data: await xlsxBytes(['Product ID', 'Product', 'Qty sold', 'Days', 'Has BOM'],
+          prods.map((p) => [p.pid, p.name, Number(p.qty), Number(p.days), p.has_bom ? 'Yes' : 'No'])) });
+        summary.push(`Sales summary · ${k.name}: ${prods.length} products`);
+      } catch (e) { summary.push(`Sales summary · ${k.name}: skipped (${e instanceof Error ? e.message : String(e)})`); }
     }
   }
 

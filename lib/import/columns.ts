@@ -1,6 +1,6 @@
 // تعريف أعمدة كل موديول + قراءة الأعمدة بالاسم (الترتيب مش مهم، والزيادة بتتجاهل)
 
-export type ImportModule = 'products' | 'opening' | 'purchases' | 'wh_txn' | 'waste' | 'adjustments' | 'closing' | 'transfers';
+export type ImportModule = 'products' | 'opening' | 'purchases' | 'waste' | 'adjustments' | 'closing' | 'transfers';
 type Kind = 'text' | 'number' | 'date';
 
 export type FieldSpec = { key: string; label: string; kind: Kind; aliases: string[] };
@@ -57,7 +57,6 @@ export const MODULES: Record<ImportModule, ModuleSpec> = {
   },
   opening: txSpec('opening', 'Opening Balance', 'opening_balance'),
   purchases: txSpec('purchases', 'Purchases', 'purchases'),
-  wh_txn: txSpec('wh_txn', 'Warehouse Transactions', 'warehouse_transactions'),
   waste: txSpec('waste', 'Waste', 'waste', 'required'),
   adjustments: txSpec('adjustments', 'Stock Adjustments', 'stock_adjustments', 'required'),
   closing: txSpec('closing', 'Closing / Stock Count', 'closing_stock_count'),
@@ -72,7 +71,7 @@ export const MODULES: Record<ImportModule, ModuleSpec> = {
   },
 };
 
-export const MODULE_ORDER: ImportModule[] = ['products', 'opening', 'purchases', 'wh_txn', 'waste', 'adjustments', 'closing', 'transfers'];
+export const MODULE_ORDER: ImportModule[] = ['products', 'opening', 'purchases', 'waste', 'adjustments', 'closing', 'transfers'];
 
 // ---------- header + cell normalization ----------
 export function normHeader(s: unknown): string {

@@ -18,6 +18,7 @@ type R = {
   opening: number; purchases: number; transfer_in: number; transfer_out: number; waste: number;
   warehouse_txn?: number; adjustments?: number; closing_book?: number; in_transit?: number; return_pending?: number;
   closing?: number; consumption?: number; has_closing?: boolean; closing_date?: string | null;
+  sales_rm?: number; sales_consumption?: number; variance?: number;
 };
 
 type Col = { key: keyof R; label: string; qty?: boolean; bold?: boolean; title?: string };
@@ -27,7 +28,8 @@ const STOCK_COLS: Col[] = [
   { key: 'purchases', label: '+ Purchases', qty: true },
   { key: 'transfer_in', label: '+ Transfer In', qty: true, title: 'المستلم فعليًا (Confirmed)' },
   { key: 'transfer_out', label: '− Transfer Out', qty: true, title: 'المرتجع المعلق بيفضل Transfer Out لحد تأكيد رجوعه' },
-  { key: 'warehouse_txn', label: '− Warehouse Txn', qty: true },
+  { key: 'warehouse_txn', label: '− Warehouse Txn', qty: true, title: 'صفحة Warehouse Transactions اتشالت — العمود بيظهر بس لو فيه حركات قديمة' },
+  { key: 'sales_rm', label: '− Sales (BOM)', qty: true, title: 'خصم الـ RM من المبيعات على حسب الـ BOM' },
   { key: 'waste', label: '− Waste', qty: true },
   { key: 'adjustments', label: '± Adjustments', qty: true },
   { key: 'closing_book', label: '= Stock', qty: true, bold: true },
@@ -41,7 +43,9 @@ const CONS_COLS: Col[] = [
   { key: 'transfer_out', label: '− Transfer Out', qty: true },
   { key: 'closing', label: '− Closing (count)', qty: true },
   { key: 'waste', label: '− Waste', qty: true },
-  { key: 'consumption', label: '= Consumption', qty: true, bold: true },
+  { key: 'consumption', label: '= Actual consumption', qty: true, bold: true, title: 'الاستهلاك الفعلي من الجرد' },
+  { key: 'sales_consumption', label: 'From sales (BOM)', qty: true, title: 'الاستهلاك المحسوب من المبيعات × الـ BOM' },
+  { key: 'variance', label: 'Variance (actual − sales)', qty: true, bold: true, title: 'موجب = استهلكت أكتر من اللي المبيعات بتقوله · سالب = أقل' },
 ];
 
 export default function StockReportView({ kind }: { kind: 'stock' | 'consumption' }) {
@@ -54,8 +58,9 @@ export default function StockReportView({ kind }: { kind: 'stock' | 'consumption
   const [pieces, setPieces] = useState(true);
   const [byGeneric, setByGeneric] = useState(true);
   const [lastSyt, setLastSyt] = useState<Record<string, string>>({});
-  const cols = kind === 'stock' ? STOCK_COLS : CONS_COLS;
+  const baseCols = kind === 'stock' ? STOCK_COLS : CONS_COLS;
   const valueKey: keyof R = kind === 'stock' ? 'closing_book' : 'consumption';
+  const cols = useMemo(() => baseCols.filter((c) => c.key !== 'warehouse_txn' || rows.some((r) => Number(r.warehouse_txn ?? 0) !== 0)), [baseCols, rows]);
 
   const [nonce, setNonce] = useState(0);   // زرار Refresh
   useEffect(() => {
@@ -116,7 +121,7 @@ export default function StockReportView({ kind }: { kind: 'stock' | 'consumption
     cols: [{ head: 'Code', w: 11 }, { head: 'Product', w: 30 }, ...cols.map((c) => ({ head: c.label, w: 8.5, align: 'right' as const })), { head: 'Value @ current cost', w: 11, align: 'right' as const }],
     rows: shown.map((r) => [r.syt_code, r.product_name, ...cols.map((c) => fmt(r[c.key] ?? 0)), fmt(value(r), 2)]),
     foot: ['', 'Total value', ...cols.map(() => ''), fmt(total, 2)],
-    note: kind === 'consumption' ? 'Quantities are in base units (kg). Consumption = Opening + Purchases + Transfer In − Transfer Out − Closing − Waste.' : 'Quantities are in base units (kg).',
+    note: kind === 'consumption' ? 'Quantities are in base units (kg). Actual consumption = Opening + Purchases + Transfer In − Transfer Out − Closing − Waste. Variance = actual − consumption computed from sales (BOM).' : 'Quantities are in base units (kg).',
     fileBase: `${kind === 'stock' ? 'warehouse-stock' : 'consumption'}-${kitchen?.code ?? ''}-${from}_${to}`,
   });
 
@@ -148,6 +153,11 @@ export default function StockReportView({ kind }: { kind: 'stock' | 'consumption
       )}
       {cutoff && (
         <div className="alert ok" style={{ margin: 12 }} dir="auto">الاستهلاك محسوب لحد تاريخ الجرد ({cutoff}). الحركات بعده مش داخلة.</div>
+      )}
+      {kind === 'consumption' && rows.length > 0 && (
+        <div className="muted" style={{ margin: '8px 14px' }} dir="auto">
+          Variance = الاستهلاك الفعلي − الاستهلاك المحسوب من المبيعات. الأدق تسيب Group by Generic Code شغّال (المبيعات بتخصم من Syt واحد لكل Generic، والفعلي موزّع على الأحجام).
+        </div>
       )}
       {kind === 'consumption' && first?.has_closing && !cutoff && (
         <div className="muted" style={{ margin: '8px 14px' }} dir="auto">محسوب على جرد بتاريخ {first.closing_date}. المنتج اللي مش في الجرد بيتحسب Closing = 0.</div>

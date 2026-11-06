@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Kitchen, PageDef, Profile, Role } from '@/lib/types';
+import { HIDDEN_PAGES } from '@/lib/nav';
 
 const ROLES: Role[] = ['admin', 'manager', 'kitchen_user', 'viewer'];
 type Invite = { email: string; role: Role; is_active: boolean; kitchen_ids: string[]; page_keys: string[] };
@@ -13,7 +14,7 @@ function Editor({ kitchens, pages, initial, locked, submitLabel, onSubmit, email
 }) {
   const [v, setV] = useState<Values>(initial);
   const [busy, setBusy] = useState(false);
-  const assignable = pages.filter((p) => p.key !== 'access_control');
+  const assignable = pages.filter((p) => p.key !== 'access_control' && !HIDDEN_PAGES.has(p.key));
   const toggle = (arr: string[], x: string) => (arr.includes(x) ? arr.filter((y) => y !== x) : [...arr, x]);
   const isAdminRole = v.role === 'admin';
 

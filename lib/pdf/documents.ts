@@ -10,7 +10,7 @@ export type PdfDoc = {
 export type PdfResult = { blob: Blob; name: string };
 
 const TITLE: Record<string, string> = {
-  OPENING: 'Opening Balance', PURCHASE: 'Purchase', WH_TXN: 'Warehouse Transaction', WASTE: 'Waste',
+  OPENING: 'Opening Balance', PURCHASE: 'Purchase', WH_TXN: 'Warehouse Transaction', SALES: 'Sales (BOM deduction)', WASTE: 'Waste',
   ADJUSTMENT: 'Stock Adjustment', CLOSING: 'Closing / Stock Count', TRANSFER: 'Kitchens Transfer',
 };
 const SIGNATURES: Record<string, string[]> = {

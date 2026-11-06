@@ -35,10 +35,6 @@ export const NOTES: Record<ImportModule, string[]> = {
     'Qty: بالكيلو (الوحدة الأساسية) افتراضيًا. تقدر تستخدم Qty Pieces أو Qty Base بدل Qty.',
     'الصفوف بنفس التاريخ بتتجمّع في مستند واحد.',
   ],
-  wh_txn: [
-    'Warehouse Transactions: صرف من المخزن. Qty لازم تكون أقل من أو تساوي الرصيد المتاح.',
-    'Qty: بالكيلو (الوحدة الأساسية) افتراضيًا، أو Qty Pieces / Qty Base.',
-  ],
   waste: [
     'Waste: الكمية بتخصم من المخزون. Reason إجباري ولازم يكون من قايمة الأسباب (ممكن تضيف سبب من صفحة Waste).',
     'Qty: بالكيلو (الوحدة الأساسية) افتراضيًا، أو Qty Pieces / Qty Base.',

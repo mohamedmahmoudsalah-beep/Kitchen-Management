@@ -1,13 +1,8 @@
-import { redirect } from 'next/navigation';
-import DashboardView from '@/components/DashboardView';
-import { getSession } from '@/lib/auth';
-import { PAGE_HREF } from '@/lib/nav';
+import BomView from '@/components/BomView';
+import { requirePage } from '@/lib/auth';
 
-export default async function DashboardPage() {
-  const s = await getSession();
-  if (!s.pages.some((p) => p.key === 'dashboard')) {
-    const first = s.pages[0];
-    redirect(first ? PAGE_HREF[first.key] : '/no-access');
-  }
-  return <DashboardView pages={s.pages.map((p) => p.key)} />;
+export default async function BomPage() {
+  const s = await requirePage('bom');
+  const role = s.profile.role;
+  return <BomView canManage={role === 'admin' || role === 'manager'} />;
 }

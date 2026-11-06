@@ -62,9 +62,9 @@ describe('loadCached (stale-while-revalidate)', () => {
 
 describe('which rpc calls clear the cache', () => {
   it('reads keep it, writes clear it', () => {
-    for (const n of ['report_consumption', 'report_warehouse_stock', 'report_low_stock', 'dashboard_summary', 'dashboard_trend', 'documents_search', 'product_card', 'last_purchased_syt', 'page_data_preview', 'purge_preview', 'import_validate', 'my_session'])
+    for (const n of ['report_consumption', 'report_warehouse_stock', 'report_low_stock', 'dashboard_summary', 'dashboard_trend', 'documents_search', 'product_card', 'last_purchased_syt', 'page_data_preview', 'purge_preview', 'import_validate', 'my_session', 'fp_search', 'bom_detail', 'bom_validate', 'sales_live'])
       expect(isWriteRpc(n)).toBe(false);
-    for (const n of ['post_document', 'reverse_document', 'edit_document_line', 'save_document', 'import_commit', 'purge_range', 'purge_page_data', 'save_product', 'close_period', 'reset_all_data'])
+    for (const n of ['post_document', 'reverse_document', 'edit_document_line', 'save_document', 'import_commit', 'purge_range', 'purge_page_data', 'save_product', 'close_period', 'reset_all_data', 'sales_import_day', 'sales_delete_day', 'bom_stage', 'bom_commit', 'sales_map_save'])
       expect(isWriteRpc(n)).toBe(true);
   });
   it('low stock import: validate keeps the cache, commit clears it', () => {

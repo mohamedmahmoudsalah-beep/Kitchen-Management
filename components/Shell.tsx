@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  LayoutDashboard, PackageOpen, ShoppingCart, ArrowLeftRight, Warehouse, Trash2, ClipboardCheck,
+  LayoutDashboard, PackageOpen, ShoppingCart, ArrowLeftRight, Receipt, BookOpen, Trash2, ClipboardCheck,
   Flame, Boxes, SlidersHorizontal, Database, FileUp, FileWarning, ShieldCheck, ScrollText,
   Search, PanelLeftClose, PanelLeftOpen, LogOut, TrendingDown,
 } from 'lucide-react';
@@ -15,7 +15,7 @@ import Logo from '@/components/Logo';
 
 const ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
   dashboard: LayoutDashboard, opening_balance: PackageOpen, purchases: ShoppingCart, kitchens_transfer: ArrowLeftRight,
-  warehouse_transactions: Warehouse, waste: Trash2, closing_stock_count: ClipboardCheck, consumption: Flame,
+  sales: Receipt, bom: BookOpen, waste: Trash2, closing_stock_count: ClipboardCheck, consumption: Flame,
   warehouse_stock: Boxes, low_stock: TrendingDown, stock_adjustments: SlidersHorizontal, data_product: Database, import_export: FileUp,
   import_errors: FileWarning, access_control: ShieldCheck, audit_log: ScrollText,
 };

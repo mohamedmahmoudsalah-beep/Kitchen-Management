@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { invalidateAll } from '@/lib/cache';
 
 // دوال قراءة بس (مبتمسحش الـ Cache). أي RPC تاني بيتعامل معاه كأنه كتابة.
-const READ_ONLY = /^(report_|dashboard_|documents_search$|product_card$|last_purchased_syt$|page_data_preview$|purge_preview$|transfer_kitchens$|my_session$)/;
+const READ_ONLY = /^(report_|dashboard_|documents_search$|product_card$|last_purchased_syt$|page_data_preview$|purge_preview$|transfer_kitchens$|my_session$|fp_search$|bom_detail$|bom_validate$|sales_live$)/;
 export const isWriteRpc = (name: string, args?: Record<string, unknown>) =>
   !READ_ONLY.test(name) && !(name === 'import_validate') && !(name === 'stock_levels_import' && args?.p_commit === false);
 

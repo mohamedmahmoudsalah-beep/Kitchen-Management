@@ -41,6 +41,11 @@ Import الـ repo، وضيف المتغيرين `NEXT_PUBLIC_SUPABASE_URL` و `
 - **كل مطبخ = Location مخزون واحد** (WAREHOUSE). `IN_TRANSIT` و`RETURN_PENDING` محجوزين للتحويلات (الدفعة 2).
 - Schema جاهز لـ V2: `odoo_po_id`, `odoo_ref`, `odoo_po_line_id`, `qty_ordered_base`.
 
+## الدفعة 17 (024) — BOM + Sales + Consumption
+- شغّل `supabase/migrations/024_batch17_bom_sales_consumption.sql` بعد 023. بعدها: **Access Control** → ادّي صفحتي **Sales** و **BOM** للمستخدمين المطلوبين (الـ Admin بيشوفهم تلقائي).
+- الترتيب: ارفع الـ BOM (صفحة BOM) ← ارفع المبيعات (صفحة Sales) ← الاستهلاك بيظهر في Consumption. التفاصيل في `PROJECT_SUMMARY.md`.
+- اختبارات الدفعة: `supabase/tests/95_tests_batch17.sql` (Postgres) + `tests/batch17.test.ts`.
+
 ## الدفعة 8 (016) — مسح كل البيانات
 - **Import/Export ← منطقة الخطر (Admin بس)**: زرار Delete all data بكلمة سر وتأكيد. بيمسح المستندات والحركات والأرصدة والفترات والمنتجات وسجل الـ Import والـ Audit ويرجّع الترقيم من 1. بيفضل المستخدمين والمطابخ وأسباب Waste/Adjustments. بيسيب أثر واحد في الـ Audit (ADMIN_RESET_ALL).
 - **قبل ما الناس تشتغل بجد** شغّل في SQL Editor: `drop function public.reset_all_data(text);` عشان الزرار مايبقاش موجود في الإنتاج.
